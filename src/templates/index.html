@@ -1,0 +1,2220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantCore - AI量化分析平台</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1419; color: #e7e9ea; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid #2f3336; margin-bottom: 20px; }
+        header h1 { color: #1d9bf0; font-size: 24px; }
+        .status { font-size: 12px; color: #8b949e; }
+        .status.online { color: #00c853; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { padding: 10px 20px; background: #212327; border: none; border-radius: 8px; color: #e7e9ea; cursor: pointer; transition: all 0.2s; }
+        .tab:hover { background: #2f3336; }
+        .tab.active { background: #1d9bf0; color: white; }
+        .panel { background: #16181c; border-radius: 12px; padding: 24px; margin-bottom: 20px; overflow: visible; }
+        .panel h2 { font-size: 18px; margin-bottom: 16px; color: #e7e9ea; }
+        .form-row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 150px; }
+        .form-group label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; background: #212327; border: 1px solid #2f3336; border-radius: 8px; color: #e7e9ea; font-size: 14px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #1d9bf0; }
+        .form-group textarea { min-height: 150px; resize: vertical; font-family: monospace; }
+        .btn { padding: 10px 24px; background: #1d9bf0; border: none; border-radius: 8px; color: white; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+        .btn:hover { background: #1a8cd8; }
+        .btn:disabled { background: #2f3336; cursor: not-allowed; }
+        .btn-secondary { background: #212327; border: 1px solid #2f3336; }
+        .btn-secondary:hover { background: #2f3336; }
+        .result { background: #0f1419; border-radius: 8px; padding: 16px; margin-top: 16px; font-size: 13px; line-height: 1.6; overflow-x: auto; }
+        .result.error { border: 1px solid #f85149; color: #f85149; }
+        .result.success { border: 1px solid #00c853; }
+        .result pre { white-space: pre-wrap; word-wrap: break-word; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+        .stat { background: #212327; padding: 12px; border-radius: 8px; text-align: center; }
+        .stat-value { font-size: 20px; font-weight: bold; color: #1d9bf0; }
+        .stat-label { font-size: 11px; color: #8b949e; margin-top: 4px; }
+        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #1d9bf0; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; margin-right: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #2f3336; }
+        th { color: #8b949e; font-weight: normal; }
+        tr:hover { background: #212327; }
+        .nav { display: flex; gap: 20px; align-items: center; }
+        .nav a { color: #8b949e; text-decoration: none; font-size: 14px; }
+        .nav a:hover { color: #1d9bf0; }
+        .notification-bell { position: relative; cursor: pointer; font-size: 20px; }
+        .notification-badge { position: absolute; top: -8px; right: -8px; background: #f85149; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; min-width: 18px; text-align: center; }
+        .notification-dropdown { position: absolute; top: 30px; right: 0; width: 360px; max-height: 480px; overflow-y: auto; background: #1e1e1e; border: 1px solid #2f3336; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 1000; display: none; }
+        .notification-dropdown.show { display: block; }
+        .notification-item { padding: 12px 16px; border-bottom: 1px solid #2f3336; }
+        .notification-item:last-child { border-bottom: none; }
+        .notification-item.unread { background: rgba(29, 155, 240, 0.1); }
+        .notification-item .notif-time { font-size: 11px; color: #8b949e; }
+        .notification-item .notif-message { font-size: 13px; margin: 4px 0; }
+        .notification-item .notif-symbol { color: #1d9bf0; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>QuantCore</h1>
+            <nav class="nav">
+                <a href="#" onclick="showSection('analyze')">AI分析</a>
+                <a href="#" onclick="showSection('signal')">AI信号</a>
+                <a href="#" onclick="showSection('backtest')">回测</a>
+                <a href="#" onclick="showSection('custom')">自定义指标</a>
+                <a href="#" onclick="showSection('simulator')">模拟交易</a>
+                <a href="#" onclick="showSection('history')">历史</a>
+                <a href="/docs" target="_blank">API文档</a>
+                <div class="notification-bell" onclick="toggleNotificationDropdown()" title="通知">
+                    🔔
+                    <span id="notif-badge" class="notification-badge" style="display:none;">0</span>
+                </div>
+                <div id="notif-dropdown" class="notification-dropdown">
+                    <div style="padding:12px 16px;border-bottom:1px solid #2f3336;display:flex;justify-content:space-between;align-items:center;">
+                        <strong>通知</strong>
+                        <button onclick="markAllRead()" style="background:none;border:none;color:#1d9bf0;cursor:pointer;font-size:12px;">全部标为已读</button>
+                    </div>
+                    <div id="notif-list"></div>
+                </div>
+            </nav>
+        </header>
+
+        <!-- AI分析 -->
+        <div id="section-analyze" class="section">
+            <div class="panel">
+                <h2>AI技术分析</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="analyze-symbol" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>时间周期</label>
+                        <select id="analyze-timeframe">
+                            <option value="1m">1分钟</option>
+                            <option value="5m">5分钟</option>
+                            <option value="15m">15分钟</option>
+                            <option value="30m">30分钟</option>
+                            <option value="1H">1小时</option>
+                            <option value="4H">4小时</option>
+                            <option value="1D" selected>1天</option>
+                            <option value="1W">1周</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>天数</label>
+                        <input type="number" id="analyze-days" value="30" min="7" max="365">
+                    </div>
+                </div>
+                <button class="btn" onclick="runAnalyze()">分析</button>
+                <div id="analyze-result" class="result" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- AI信号 -->
+        <div id="section-signal" class="section" style="display:none;">
+            <div class="panel">
+                <h2>AI 实时交易信号</h2>
+                <p style="font-size:12px;color:#8b949e;margin-bottom:16px;">
+                    基于多周期技术指标共识的AI实时交易建议，包含入场价、止损、止盈
+                </p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="signal-symbol" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>时间周期</label>
+                        <select id="signal-timeframe">
+                            <option value="1m">1分钟</option>
+                            <option value="5m">5分钟</option>
+                            <option value="15m">15分钟</option>
+                            <option value="30m">30分钟</option>
+                            <option value="1H" selected>1小时</option>
+                            <option value="4H">4小时</option>
+                            <option value="1D">1天</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>天数</label>
+                        <input type="number" id="signal-days" value="7" min="3" max="90">
+                    </div>
+                </div>
+                <button class="btn" onclick="runSignal()">获取信号</button>
+                <div id="signal-result" class="result" style="display:none;"></div>
+            </div>
+
+            <div class="panel">
+                <h2>AI 分析历史</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对（可选）</label>
+                        <input type="text" id="history-symbol" placeholder="不填则显示所有">
+                    </div>
+                    <div class="form-group">
+                        <label>天数</label>
+                        <input type="number" id="ai-history-days" value="7" min="1" max="90">
+                    </div>
+                </div>
+                <button class="btn" onclick="loadAIHistory()">加载历史</button>
+                <div id="ai-history-result"></div>
+            </div>
+
+            <div class="panel">
+                <h2>AI 性能统计</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对（可选）</label>
+                        <input type="text" id="perf-symbol" placeholder="不填则显示所有">
+                    </div>
+                    <div class="form-group">
+                        <label>天数</label>
+                        <input type="number" id="perf-days" value="30" min="1" max="365">
+                    </div>
+                </div>
+                <button class="btn" onclick="loadPerformance()">查看统计</button>
+                <div id="perf-result"></div>
+            </div>
+        </div>
+
+        <!-- 回测 -->
+        <div id="section-backtest" class="section" style="display:none;">
+            <div class="panel">
+                <h2>策略回测</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="bt-symbol" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>时间周期</label>
+                        <select id="bt-timeframe">
+                            <option value="1m">1分钟</option>
+                            <option value="5m">5分钟</option>
+                            <option value="15m">15分钟</option>
+                            <option value="30m">30分钟</option>
+                            <option value="1H">1小时</option>
+                            <option value="4H" selected>4小时</option>
+                            <option value="1D">1天</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>天数</label>
+                        <input type="number" id="bt-days" value="30" min="7" max="365">
+                    </div>
+                    <div class="form-group">
+                        <label>初始资金</label>
+                        <input type="number" id="bt-balance" value="10000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>止损 (%)</label>
+                        <input type="number" id="bt-stoploss" value="2" step="0.5">
+                    </div>
+                    <div class="form-group">
+                        <label>止盈 (%)</label>
+                        <input type="number" id="bt-takeprofit" value="6" step="0.5">
+                    </div>
+                    <div class="form-group">
+                        <label>手续费 (%)</label>
+                        <input type="number" id="bt-commission" value="0.1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>指标</label>
+                        <select id="bt-indicators">
+                            <option value="rsi">RSI</option>
+                            <option value="macd">MACD</option>
+                            <option value="both">RSI + MACD</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn" onclick="runBacktest()">运行回测</button>
+                <div id="backtest-result" class="result" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- 自定义指标 -->
+        <div id="section-custom" class="section" style="display:none;">
+            <div class="panel">
+                <h2>自定义指标脚本</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="script-symbol" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>时间周期</label>
+                        <select id="script-timeframe">
+                            <option value="1m">1分钟</option>
+                            <option value="5m">5分钟</option>
+                            <option value="15m">15分钟</option>
+                            <option value="30m">30分钟</option>
+                            <option value="1H">1小时</option>
+                            <option value="4H" selected>4小时</option>
+                            <option value="1D">1天</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>天数</label>
+                        <input type="number" id="script-days" value="30">
+                    </div>
+                    <div class="form-group">
+                        <label>止损 (%)</label>
+                        <input type="number" id="script-stoploss" value="3" step="0.5">
+                    </div>
+                    <div class="form-group">
+                        <label>止盈 (%)</label>
+                        <input type="number" id="script-takeprofit" value="10" step="0.5">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label>指标代码 (Python)</label>
+                    <textarea id="script-code" placeholder="编写你的指标代码，必须定义 output 变量"></textarea>
+                </div>
+                <div style="margin-top: 12px;">
+                    <button class="btn" onclick="loadExample('rsi')">RSI示例</button>
+                    <button class="btn btn-secondary" onclick="loadExample('macd')">MACD示例</button>
+                    <button class="btn btn-secondary" onclick="loadExample('boll')">布林带示例</button>
+                    <button class="btn btn-secondary" onclick="checkCodeQuality()">代码审查</button>
+                </div>
+                <div id="quality-result" class="result" style="display:none; margin-top:12px;"></div>
+                <button class="btn" style="margin-top: 16px;" onclick="runScript()">运行回测</button>
+                <div id="script-result" class="result" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- 模拟交易 -->
+        <div id="section-simulator" class="section" style="display:none;">
+            <!-- K线图表 -->
+            <div class="panel">
+                <h2>K 线走势 <span id="chart-symbol" style="color:#1d9bf0;"></span></h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="chart-symbol-input" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>周期</label>
+                        <select id="chart-timeframe" onchange="startKlineAutoRefresh()">
+                            <option value="1m">1分钟</option>
+                            <option value="5m">5分钟</option>
+                            <option value="15m">15分钟</option>
+                            <option value="1H" selected>1小时</option>
+                            <option value="4H">4小时</option>
+                            <option value="1D">1天</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>天数</label>
+                        <input type="number" id="chart-days" value="7" min="1" max="30" onchange="startKlineAutoRefresh()">
+                    </div>
+                    <div class="form-group">
+                        <button class="btn" onclick="startKlineAutoRefresh()">刷新</button>
+                    </div>
+                </div>
+                <div id="kline-container" style="margin-top:16px;position:relative;padding-bottom:40px;overflow:visible;min-height:490px;">
+                    <div id="kline-chart" style="height:450px;width:100%;border-radius:8px;overflow:visible;min-height:450px;display:block;box-sizing:border-box;border:1px solid #2f3336;"></div>
+                    <div id="kline-info" style="position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.7);padding:8px 12px;border-radius:4px;font-size:12px;color:#8b949e;z-index:10;"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>模拟交易 <span id="ws-status" style="font-size:12px;color:#8b949e;margin-left:8px;">WebSocket: 连接中...</span></h2>
+                <p style="font-size:12px;color:#8b949e;margin-bottom:16px;">
+                    实时模拟交易执行，包含市价单、限价单、平仓功能
+                </p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="sim-symbol" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>数量</label>
+                        <input type="number" id="sim-amount" value="0.1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>当前价格</label>
+                        <input type="number" id="sim-price" value="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>订单类型</label>
+                        <select id="sim-order-type">
+                            <option value="market">市价单</option>
+                            <option value="limit">限价单</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="sim-limit-price-group" style="display:none;">
+                        <label>限价</label>
+                        <input type="number" id="sim-limit-price" value="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <button class="btn" style="background:#28a745;" onclick="simBuy()">买入开多</button>
+                    <button class="btn" style="background:#dc3545;" onclick="simSell()">卖出开空</button>
+                    <button class="btn btn-secondary" onclick="simClose()">平仓</button>
+                    <button class="btn btn-secondary" onclick="simReset()">重置</button>
+                </div>
+                <div id="sim-status" class="result" style="margin-top:12px;"></div>
+                            </div>
+
+            <!-- AI 信号 -->
+            <div class="panel">
+                <h2>AI 交易信号</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="sig-symbol" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>周期</label>
+                        <select id="sig-timeframe">
+                            <option value="1m">1分钟</option>
+                            <option value="5m">5分钟</option>
+                            <option value="15m">15分钟</option>
+                            <option value="30m">30分钟</option>
+                            <option value="1H" selected>1小时</option>
+                            <option value="4H">4小时</option>
+                            <option value="1D">1天</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn" onclick="loadSimIndicators()">获取指标</button>
+                        <button class="btn" onclick="getAISignal()" style="margin-left:8px;">AI信号</button>
+                    </div>
+                </div>
+                <div id="sim-indicators" class="result" style="display:none;margin-top:12px;"></div>
+                <div id="sim-ai-signal" class="result" style="display:none;margin-top:12px;"></div>
+            </div>
+
+            <!-- 自动交易 -->
+            <div class="panel">
+                <h2>自动交易 <span id="auto-trading-status" style="font-size:12px;color:#8b949e;"></span></h2>
+                <p style="font-size:12px;color:#8b949e;margin-bottom:16px;">
+                    AI智能分析 + 策略配置自动执行，支持风控保护
+                </p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="auto-symbol" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>周期</label>
+                        <select id="auto-timeframe">
+                            <option value="1m">1分钟</option>
+                            <option value="5m">5分钟</option>
+                            <option value="15m">15分钟</option>
+                            <option value="1H" selected>1小时</option>
+                            <option value="4H">4小时</option>
+                            <option value="1D">1天</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>置信度阈值 (%)</label>
+                        <input type="number" id="auto-confidence" value="70" min="50" max="95" step="5">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>仓位比例 (%)</label>
+                        <input type="number" id="auto-position-size" value="10" min="1" max="100" step="5">
+                    </div>
+                    <div class="form-group">
+                        <label>止损比例 (%)</label>
+                        <input type="number" id="auto-stop-loss" value="2" min="0.5" max="10" step="0.5">
+                    </div>
+                    <div class="form-group">
+                        <label>止盈比例 (%)</label>
+                        <input type="number" id="auto-take-profit" value="6" min="1" max="20" step="0.5">
+                    </div>
+                </div>
+
+                <!-- AI策略助手 -->
+                <details style="margin-top:16px;border:1px solid #2f3336;border-radius:8px;padding:12px;" open>
+                    <summary style="cursor:pointer;color:#00c853;font-weight:500;">🤖 AI策略助手 - 用中文描述你的策略</summary>
+                    <div style="margin-top:12px;">
+                        <div class="form-group">
+                            <label>描述你的策略（例如：RSI超卖买入，MACD金叉确认，止损2%）</label>
+                            <textarea id="strategy-description" style="min-height:80px;" placeholder="例如：当RSI低于25且MACD形成金叉时买入，使用布林带下轨作为参考，止损设在2%..."></textarea>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <button type="button" class="btn btn-secondary" onclick="applyStrategyFromDescription()">🔮 AI推荐阈值</button>
+                            <span id="strategy-desc-status" style="font-size:12px;color:#8b949e;margin-left:12px;"></span>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- 策略配置 -->
+                <details style="margin-top:16px;border:1px solid #2f3336;border-radius:8px;padding:12px;">
+                    <summary style="cursor:pointer;color:#1d9bf0;font-weight:500;">策略配置（手动调整）</summary>
+                    <div style="margin-top:12px;">
+                        <p style="font-size:12px;color:#8b949e;margin-bottom:12px;">
+                            配置AI分析的指标阈值，AI将根据这些条件综合判断交易信号
+                        </p>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>使用指标</label>
+                                <select id="auto-indicators" multiple style="height:90px;">
+                                    <option value="rsi" selected>RSI</option>
+                                    <option value="macd" selected>MACD</option>
+                                    <option value="boll" selected>布林带</option>
+                                    <option value="ma">均线</option>
+                                    <option value="kdj">KDJ</option>
+                                    <option value="volume">成交量</option>
+                                </select>
+                                <small style="color:#8b949e;font-size:10px;">按住Ctrl多选</small>
+                            </div>
+                            <div class="form-group">
+                                <label>RSI超卖值</label>
+                                <input type="number" id="auto-rsi-oversold" value="30" min="10" max="40" step="1">
+                                <label style="margin-top:8px;">RSI超买值</label>
+                                <input type="number" id="auto-rsi-overbought" value="70" min="60" max="90" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label>布林带低位 (%)</label>
+                                <input type="number" id="auto-boll-low" value="20" min="5" max="40" step="5">
+                                <label style="margin-top:8px;">布林带高位 (%)</label>
+                                <input type="number" id="auto-boll-high" value="80" min="60" max="95" step="5">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label style="display:flex;align-items:center;">
+                                    <input type="checkbox" id="auto-macd-confirm" checked style="width:auto;margin-right:8px;">
+                                    MACD确认（MACD > Signal）
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label style="display:flex;align-items:center;">
+                                    <input type="checkbox" id="auto-ma-confirm" checked style="width:auto;margin-right:8px;">
+                                    均线确认（MA7 > MA25 > MA99）
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label style="display:flex;align-items:center;">
+                                    <input type="checkbox" id="auto-kdj-confirm" style="width:auto;margin-right:8px;">
+                                    KDJ确认（K>D且J<30超卖）
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label style="display:flex;align-items:center;">
+                                    <input type="checkbox" id="auto-volume-confirm" style="width:auto;margin-right:8px;">
+                                    成交量确认（放量配合方向）
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- 风控配置 -->
+                <details style="margin-top:16px;border:1px solid #2f3336;border-radius:8px;padding:12px;">
+                    <summary style="cursor:pointer;color:#f85149;font-weight:500;">风控配置（保护本金）</summary>
+                    <div style="margin-top:12px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label style="display:flex;align-items:center;">
+                                    <input type="checkbox" id="auto-use-atr" style="width:auto;margin-right:8px;">
+                                    使用ATR动态止损（高波动币适用）
+                                </label>
+                                <input type="number" id="auto-atr-mult" value="2" min="1" max="5" step="0.5" style="margin-top:4px;" placeholder="ATR倍数">
+                            </div>
+                            <div class="form-group">
+                                <label>追踪止盈 (%)</label>
+                                <input type="number" id="auto-trailing-stop" value="0" min="0" max="10" step="0.5" placeholder="0=不启用">
+                                <small style="color:#8b949e;font-size:10px;">从最高点回落超过此比例自动止盈</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>最大回撤保护 (%)</label>
+                                <input type="number" id="auto-max-dd" value="10" min="5" max="50" step="5">
+                                <small style="color:#8b949e;font-size:10px;">亏损达到此比例自动停止交易</small>
+                            </div>
+                            <div class="form-group">
+                                <label>单日最大亏损 (%)</label>
+                                <input type="number" id="auto-max-daily-loss" value="5" min="2" max="20" step="1">
+                                <small style="color:#8b949e;font-size:10px;">日亏损达到此比例自动停止交易</small>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <div class="form-row" style="margin-top:16px;">
+                    <button class="btn btn-secondary" id="auto-backtest-btn" onclick="runStrategyBacktest()">📊 回测验证</button>
+                    <button class="btn" id="auto-start-btn" style="background:#28a745;" onclick="startAutoTrading()">启动自动交易</button>
+                    <button class="btn" id="auto-stop-btn" style="background:#dc3545;display:none;" onclick="stopAutoTrading()">停止自动交易</button>
+                </div>
+                <div id="auto-result" class="result" style="margin-top:12px;display:none;"></div>
+            </div>
+
+            <!-- 回测结果 -->
+            <div class="panel" id="backtest-result-panel" style="display:none;">
+                <h2>策略回测结果</h2>
+                <div id="backtest-summary"></div>
+                <div id="backtest-trades" style="margin-top:16px;"></div>
+            </div>
+
+            <!-- 自动交易详情 -->
+            <div class="panel">
+                <h2>自动交易详情 <span id="auto-detail-refresh" style="font-size:12px;color:#8b949e;margin-left:8px;"></span></h2>
+                <div id="auto-trading-detail" style="max-height:500px;overflow-y:auto;">
+                    <p style="color:#8b949e;text-align:center;">暂无数据，请先启动自动交易</p>
+                </div>
+            </div>
+
+            <!-- AI交易记录 -->
+            <div class="panel">
+                <h2>AI交易记录</h2>
+                <div id="trade-history" style="max-height:300px;overflow-y:auto;">
+                    <p style="color:#8b949e;font-size:12px;">暂无交易记录</p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>持仓监控设置</h2>
+                <p style="font-size:12px;color:#8b949e;margin-bottom:16px;">
+                    设置持仓监控，触发止盈/止损时发送通知
+                </p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>交易对</label>
+                        <input type="text" id="mon-symbol" value="BTC/USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>开仓方向</label>
+                        <select id="mon-side">
+                            <option value="long">做多</option>
+                            <option value="short">做空</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>开仓价格</label>
+                        <input type="number" id="mon-entry" value="50000" step="0.01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>止损 (%)</label>
+                        <input type="number" id="mon-stoploss" value="2" step="0.5">
+                    </div>
+                    <div class="form-group">
+                        <label>止盈 (%)</label>
+                        <input type="number" id="mon-takeprofit" value="6" step="0.5">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <button class="btn" onclick="addMonitor()">添加监控</button>
+                    <button class="btn btn-secondary" onclick="toggleMonitorService()">
+                        <span id="mon-service-status">启动监控服务</span>
+                    </button>
+                </div>
+                <div id="mon-result" class="result" style="margin-top:12px;display:none;"></div>
+            </div>
+
+            <div class="panel">
+                <h2>策略快照</h2>
+                <p style="font-size:12px;color:#8b949e;margin-bottom:16px;">
+                    将策略配置转换为回测就绪格式
+                </p>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>策略配置 (JSON)</label>
+                        <textarea id="snapshot-input" style="width:100%;height:120px;font-family:monospace;font-size:12px;" placeholder='{"name":"My Strategy","trading_config":{"stop_loss_pct":2,"take_profit_pct":6}}'></textarea>
+                    </div>
+                </div>
+                <button class="btn" onclick="getSnapshot()">解析策略</button>
+                <div id="snapshot-result" class="result" style="display:none;margin-top:12px;"></div>
+            </div>
+        </div>
+
+        <!-- 历史 -->
+        <div id="section-history" class="section" style="display:none;">
+            <div class="panel">
+                <h2>回测历史</h2>
+                <button class="btn" onclick="loadHistory()">刷新</button>
+                <div id="history-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+
+        function showSection(name) {
+            document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+            const section = document.getElementById('section-' + name);
+            section.style.display = 'block';
+            if (name === 'history') loadHistory();
+            if (name === 'simulator') {
+                // Wait for layout then create chart
+                setTimeout(() => {
+                    if (!klineChart) {
+                        initKlineChart();
+                    } else if (klineContainer) {
+                        klineChart.resize(klineContainer.clientWidth, 450);
+                    }
+                    loadKlineChart();
+                }, 200);
+            }
+        }
+
+        async function api(endpoint, data) {
+            try {
+                const resp = await fetch(API_BASE + endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                return await resp.json();
+            } catch (e) {
+                return { success: false, error: e.message };
+            }
+        }
+
+        function showLoading(el) {
+            el.innerHTML = '<span class="loading"></span>加载中...';
+            el.style.display = 'block';
+        }
+
+        function showResult(el, data) {
+            if (data.success) {
+                el.className = 'result success';
+                el.innerHTML = '<pre>' + JSON.stringify(data.data || data, null, 2) + '</pre>';
+            } else {
+                el.className = 'result error';
+                el.innerHTML = '错误: ' + (data.error || data.detail || '未知错误');
+            }
+        }
+
+        // AI分析
+        async function runAnalyze() {
+            const el = document.getElementById('analyze-result');
+            showLoading(el);
+
+            const data = {
+                symbol: document.getElementById('analyze-symbol').value,
+                timeframe: document.getElementById('analyze-timeframe').value,
+                days: parseInt(document.getElementById('analyze-days').value)
+            };
+
+            const result = await api('/api/v1/analyze', data);
+            if (result.success) {
+                el.innerHTML = `
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-value">${result.data.current_price?.toFixed(2) || 'N/A'}</div>
+                            <div class="stat-label">当前价格</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${result.data.trend || 'N/A'}</div>
+                            <div class="stat-label">趋势</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${((result.data.trend_strength || 0) * 100).toFixed(0)}%</div>
+                            <div class="stat-label">趋势强度</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${result.data.risk_level || 'N/A'}</div>
+                            <div class="stat-label">风险等级</div>
+                        </div>
+                    </div>
+                    <pre style="margin-top:16px;">${result.report || ''}</pre>
+                `;
+                el.className = 'result success';
+            } else {
+                showResult(el, result);
+            }
+        }
+
+        // 回测
+        async function runBacktest() {
+            const el = document.getElementById('backtest-result');
+            showLoading(el);
+
+            const indicators = document.getElementById('bt-indicators').value;
+            const data = {
+                symbol: document.getElementById('bt-symbol').value,
+                timeframe: document.getElementById('bt-timeframe').value,
+                days: parseInt(document.getElementById('bt-days').value),
+                initial_balance: parseFloat(document.getElementById('bt-balance').value),
+                stop_loss: parseFloat(document.getElementById('bt-stoploss').value),
+                take_profit: parseFloat(document.getElementById('bt-takeprofit').value),
+                commission: parseFloat(document.getElementById('bt-commission').value) / 100,
+                use_rsi: indicators === 'rsi' || indicators === 'both',
+                use_macd: indicators === 'macd' || indicators === 'both'
+            };
+
+            const result = await api('/api/v1/backtest', data);
+            if (result.success) {
+                const d = result.data;
+                el.innerHTML = `
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-value">${d.total_trades || 0}</div>
+                            <div class="stat-label">交易次数</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${(d.win_rate || 0).toFixed(1)}%</div>
+                            <div class="stat-label">胜率</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">$${(d.total_pnl || 0).toFixed(2)}</div>
+                            <div class="stat-label">总收益</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">$${(d.final_balance || 0).toFixed(2)}</div>
+                            <div class="stat-label">最终资金</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${(d.max_drawdown_pct || 0).toFixed(2)}%</div>
+                            <div class="stat-label">最大回撤</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${(d.sharpe_ratio || 0).toFixed(2)}</div>
+                            <div class="stat-label">夏普比率</div>
+                        </div>
+                    </div>
+                    <p style="margin-top:12px;font-size:12px;color:#8b949e;">回测ID: ${result.run_id}</p>
+                `;
+                el.className = 'result success';
+            } else {
+                showResult(el, result);
+            }
+        }
+
+        // 加载示例
+        async function loadExample(type) {
+            const resp = await fetch(API_BASE + '/api/v1/indicator/examples');
+            const data = await resp.json();
+            if (data.success) {
+                document.getElementById('script-code').value = data.data[type];
+            }
+        }
+
+        // 验证代码
+        async function validateCode() {
+            const code = document.getElementById('script-code').value;
+            const resp = await fetch(API_BASE + '/api/v1/indicator/validate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({code})
+            });
+            const data = await resp.json();
+            alert(data.valid ? '✅ 代码有效' : '❌ ' + data.error);
+        }
+
+        // 运行自定义脚本
+        async function runScript() {
+            const el = document.getElementById('script-result');
+            showLoading(el);
+
+            const data = {
+                symbol: document.getElementById('script-symbol').value,
+                code: document.getElementById('script-code').value,
+                timeframe: document.getElementById('script-timeframe').value,
+                days: parseInt(document.getElementById('script-days').value),
+                initial_balance: 10000,
+                stop_loss: parseFloat(document.getElementById('script-stoploss').value),
+                take_profit: parseFloat(document.getElementById('script-takeprofit').value),
+                commission: 0.001
+            };
+
+            const result = await api('/api/v1/script/backtest', data);
+            if (result.success) {
+                const d = result.backtest;
+                el.innerHTML = `
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-value">${d.total_trades || 0}</div>
+                            <div class="stat-label">交易次数</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${(d.win_rate || 0).toFixed(1)}%</div>
+                            <div class="stat-label">胜率</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">$${(d.total_pnl || 0).toFixed(2)}</div>
+                            <div class="stat-label">总收益</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${(d.max_drawdown_pct || 0).toFixed(2)}%</div>
+                            <div class="stat-label">最大回撤</div>
+                        </div>
+                    </div>
+                `;
+                el.className = 'result success';
+            } else {
+                showResult(el, result);
+            }
+        }
+
+        // 代码审查
+        async function checkCodeQuality() {
+            const el = document.getElementById('quality-result');
+            const code = document.getElementById('script-code').value;
+            if (!code.trim()) {
+                el.innerHTML = '请先输入代码';
+                el.className = 'result error';
+                el.style.display = 'block';
+                return;
+            }
+            el.innerHTML = '<span class="loading"></span>审查中...';
+            el.style.display = 'block';
+
+            const resp = await fetch(API_BASE + '/api/v1/indicator/quality', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({code})
+            });
+            const data = await resp.json();
+
+            if (data.success && data.hints.length > 0) {
+                let html = '<h3 style="margin-bottom:12px;">审查结果</h3>';
+                data.hints.forEach(h => {
+                    const color = h.severity === 'error' ? '#f85149' : h.severity === 'warn' ? '#f0883e' : '#8b949e';
+                    const icon = h.severity === 'error' ? '❌' : h.severity === 'warn' ? '⚠️' : 'ℹ️';
+                    html += `<p style="color:${color};margin:6px 0;">${icon} <b>${h.code}</b>: ${h.params ? JSON.stringify(h.params) : ''}</p>`;
+                });
+                el.innerHTML = html;
+                el.className = 'result success';
+            } else if (data.success) {
+                el.innerHTML = '✅ 代码检查通过，无明显问题';
+                el.className = 'result success';
+            } else {
+                el.innerHTML = '审查失败: ' + (data.detail || '未知错误');
+                el.className = 'result error';
+            }
+        }
+
+        // AI信号
+        async function runSignal() {
+            const el = document.getElementById('signal-result');
+            showLoading(el);
+
+            const symbol = document.getElementById('signal-symbol').value;
+            const timeframe = document.getElementById('signal-timeframe').value;
+            const days = document.getElementById('signal-days').value;
+
+            const resp = await fetch(API_BASE + `/api/v1/ai/signal?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&days=${days}`);
+            const data = await resp.json();
+
+            if (data.success && data.signal) {
+                const sig = data.signal;
+                const decision = sig.decision || 'HOLD';
+                const decisionColor = decision === 'BUY' ? '#00c853' : decision === 'SELL' ? '#f85149' : '#f0883e';
+
+                el.innerHTML = `
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-value" style="color:${decisionColor}">${decision}</div>
+                            <div class="stat-label">决策</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${sig.confidence || 0}%</div>
+                            <div class="stat-label">置信度</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">$${sig.entry_price || data.current_price}</div>
+                            <div class="stat-label">入场价</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color:#f85149">$${sig.stop_loss || 0}</div>
+                            <div class="stat-label">止损价</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color:#00c853">$${sig.take_profit || 0}</div>
+                            <div class="stat-label">止盈价</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${sig.position_size_pct || 10}%</div>
+                            <div class="stat-label">仓位</div>
+                        </div>
+                    </div>
+                    <p style="margin-top:12px;font-size:13px;">${sig.summary || ''}</p>
+                    <details style="margin-top:12px;">
+                        <summary style="cursor:pointer;color:#8b949e;">查看详情</summary>
+                        <div style="margin-top:8px;font-size:12px;color:#8b949e;">
+                            <p><b>理由:</b> ${(sig.key_reasons || []).join('; ')}</p>
+                            <p><b>风险:</b> ${(sig.risks || []).join('; ')}</p>
+                            <p><b>技术评分:</b> ${sig.technical_score || 0} | <b>基本面:</b> ${sig.fundamental_score || 0} | <b>情绪:</b> ${sig.sentiment_score || 0}</p>
+                        </div>
+                    </details>
+                `;
+                el.className = 'result success';
+            } else {
+                showResult(el, data);
+            }
+        }
+
+        // AI历史
+        async function loadAIHistory() {
+            const el = document.getElementById('ai-history-result');
+            const symbol = document.getElementById('history-symbol').value;
+            const days = document.getElementById('ai-history-days').value;
+
+            el.innerHTML = '<span class="loading"></span>加载中...';
+
+            let url = API_BASE + `/api/v1/ai/history?days=${days}&limit=20`;
+            if (symbol) url += `&symbol=${encodeURIComponent(symbol)}`;
+
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            if (data.success && data.data.length > 0) {
+                let html = `<table>
+                    <tr>
+                        <th>时间</th>
+                        <th>交易对</th>
+                        <th>决策</th>
+                        <th>置信度</th>
+                        <th>入场价</th>
+                    </tr>`;
+                data.data.forEach(r => {
+                    const decisionColor = r.decision === 'BUY' ? '#00c853' : r.decision === 'SELL' ? '#f85149' : '#f0883e';
+                    html += `<tr>
+                        <td>${(r.created_at || '').substring(0, 16)}</td>
+                        <td>${r.symbol}</td>
+                        <td style="color:${decisionColor}">${r.decision}</td>
+                        <td>${r.confidence || 0}%</td>
+                        <td>$${r.price_at_analysis || 0}</td>
+                    </tr>`;
+                });
+                html += '</table>';
+                el.innerHTML = html;
+            } else {
+                el.innerHTML = '<p style="color:#8b949e;">暂无分析历史</p>';
+            }
+        }
+
+        // AI性能统计
+        async function loadPerformance() {
+            const el = document.getElementById('perf-result');
+            const symbol = document.getElementById('perf-symbol').value;
+            const days = document.getElementById('perf-days').value;
+
+            el.innerHTML = '<span class="loading"></span>加载中...';
+
+            let url = API_BASE + `/api/v1/ai/performance?days=${days}`;
+            if (symbol) url += `&symbol=${encodeURIComponent(symbol)}`;
+
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            if (data.success) {
+                const d = data.data;
+                el.innerHTML = `
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-value">${d.total_analyses || 0}</div>
+                            <div class="stat-label">总分析数</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${d.correct_count || 0}</div>
+                            <div class="stat-label">正确次数</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${d.accuracy || 0}%</div>
+                            <div class="stat-label">准确率</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${d.unique_symbols || 0}</div>
+                            <div class="stat-label">交易对数</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                el.innerHTML = '<p style="color:#f85149;">加载失败</p>';
+            }
+        }
+
+        // 加载历史
+        async function loadHistory() {
+            const el = document.getElementById('history-result');
+            el.innerHTML = '<span class="loading"></span>加载中...';
+
+            const resp = await fetch(API_BASE + '/api/v1/backtest/history?limit=20');
+            const data = await resp.json();
+
+            if (data.success && data.data.length > 0) {
+                let html = `<table>
+                    <tr>
+                        <th>ID</th>
+                        <th>交易对</th>
+                        <th>周期</th>
+                        <th>策略</th>
+                        <th>收益</th>
+                        <th>胜率</th>
+                        <th>日期</th>
+                    </tr>`;
+                data.data.forEach(r => {
+                    html += `<tr>
+                        <td>${r.id}</td>
+                        <td>${r.symbol}</td>
+                        <td>${r.timeframe}</td>
+                        <td>${(r.strategy_name || 'N/A').substring(0, 15)}</td>
+                        <td style="color:${r.total_pnl >= 0 ? '#00c853' : '#f85149'}">$${r.total_pnl?.toFixed(2) || 0}</td>
+                        <td>${(r.win_rate || 0).toFixed(1)}%</td>
+                        <td>${(r.created_at || '').substring(0, 10)}</td>
+                    </tr>`;
+                });
+                html += '</table>';
+                el.innerHTML = html;
+            } else {
+                el.innerHTML = '<p style="color:#8b949e;">暂无回测历史</p>';
+            }
+        }
+
+        // WebSocket 连接
+        let ws = null;
+        let wsReconnectTimer = null;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = protocol + '//' + window.location.host + '/ws/signals';
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    document.getElementById('ws-status').textContent = 'WebSocket: 已连接';
+                    document.getElementById('ws-status').style.color = '#00c853';
+                    if (wsReconnectTimer) {
+                        clearTimeout(wsReconnectTimer);
+                        wsReconnectTimer = null;
+                    }
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg.type === 'signal') {
+                            console.log('收到信号:', msg);
+                            // 在信号面板显示实时信号
+                            const signalResult = document.getElementById('signal-result');
+                            if (signalResult) {
+                                const signal = msg.data.signal;
+                                const action = signal.action || 'HOLD';
+                                const color = action === 'BUY' ? '#00c853' : action === 'SELL' ? '#f85149' : '#8b949e';
+                                signalResult.innerHTML = `
+                                    <div style="border-left: 4px solid ${color}; padding: 12px; background: rgba(0,0,0,0.2);">
+                                        <strong style="color:${color};">[实时信号] ${action}</strong><br>
+                                        <small>${msg.timestamp ? new Date(msg.timestamp).toLocaleString() : ''}</small>
+                                        <br>置信度: ${signal.confidence || 'N/A'}
+                                    </div>
+                                `;
+                                signalResult.style.display = 'block';
+                            }
+                        }
+                    } catch (e) {
+                        console.error('WebSocket消息解析失败:', e);
+                    }
+                };
+
+                ws.onclose = () => {
+                    document.getElementById('ws-status').textContent = 'WebSocket: 已断开，正在重连...';
+                    document.getElementById('ws-status').style.color = '#f85149';
+                    wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+                };
+
+                ws.onerror = () => {
+                    document.getElementById('ws-status').textContent = 'WebSocket: 连接错误';
+                    document.getElementById('ws-status').style.color = '#f85149';
+                };
+            } catch (e) {
+                document.getElementById('ws-status').textContent = 'WebSocket: 不支持';
+                document.getElementById('ws-status').style.color = '#f85149';
+            }
+        }
+
+        // K线图表 - TradingView Lightweight Charts
+        let klineChart = null;
+        let klineCandleSeries = null;
+        let klineVolumeSeries = null;
+        let klineRefreshTimer = null;
+        let klineContainer = null;
+
+        function getKlineRefreshInterval(timeframe) {
+            if (['1m', '5m', '15m'].includes(timeframe)) return 10000;
+            if (timeframe === '1H') return 30000;
+            return 60000;
+        }
+
+        function initKlineChart() {
+            if (klineChart) return;
+
+            klineContainer = document.getElementById('kline-chart');
+            // 确保容器有实际尺寸
+            const containerWidth = klineContainer.clientWidth || 800;
+            const containerHeight = 450;
+
+            klineChart = LightweightCharts.createChart(klineContainer, {
+                width: containerWidth,
+                height: containerHeight,
+                layout: {
+                    background: { type: 'solid', color: '#1e1e1e' },
+                    textColor: '#8b949e',
+                },
+                grid: {
+                    vertLines: { color: '#2f3336' },
+                    horzLines: { color: '#2f3336' },
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+                timeScale: {
+                    borderColor: '#2f3336',
+                    borderVisible: true,
+                    timeVisible: true,
+                    secondsVisible: false,
+                    tickMarkFormatter: (time) => {
+                        const date = new Date(time * 1000);
+                        return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' +
+                               date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    },
+                },
+                rightPriceScale: {
+                    borderColor: '#2f3336',
+                },
+                handleScroll: {
+                    vertTouchDrag: false,
+                },
+            });
+
+            klineCandleSeries = klineChart.addCandlestickSeries({
+                upColor: '#00c853',
+                downColor: '#f85149',
+                borderUpColor: '#00c853',
+                borderDownColor: '#f85149',
+                wickUpColor: '#00c853',
+                wickDownColor: '#f85149',
+            });
+
+            klineVolumeSeries = klineChart.addHistogramSeries({
+                color: '#26a69a',
+                priceFormat: { type: 'volume' },
+                priceScaleId: '',
+            });
+
+            klineVolumeSeries.priceScale().applyOptions({
+                scaleMargins: { top: 0.8, bottom: 0 },
+            });
+
+            // 响应窗口大小变化
+            window.addEventListener('resize', () => {
+                if (klineChart && klineContainer) {
+                    klineChart.applyOptions({ width: klineContainer.clientWidth, height: 450 });
+                }
+            });
+        }
+
+        async function loadKlineChart() {
+            const symbol = document.getElementById('chart-symbol-input').value;
+            const timeframe = document.getElementById('chart-timeframe').value;
+            const days = parseInt(document.getElementById('chart-days').value);
+
+            document.getElementById('chart-symbol').textContent = symbol + ' ' + timeframe;
+            document.getElementById('kline-info').textContent = '加载中...';
+
+            initKlineChart();
+
+            try {
+                const resp = await fetch(API_BASE + `/api/v1/market/klines?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&days=${days}`);
+                const result = await resp.json();
+                console.log('K线数据:', result);
+
+                if (result.success && result.data && result.data.length > 0) {
+                    const data = result.data;
+                    console.log('数据条数:', data.length, '首条:', data[0]);
+
+                    // 转换数据格式
+                    const candleData = data.map(d => ({
+                        time: parseTimestamp(d.timestamp || d.time),
+                        open: parseFloat(d.open || d.O),
+                        high: parseFloat(d.high || d.H),
+                        low: parseFloat(d.low || d.L),
+                        close: parseFloat(d.close || d.C),
+                    }));
+
+                    const volumeData = data.map(d => ({
+                        time: parseTimestamp(d.timestamp || d.time),
+                        value: parseFloat(d.volume || d.V || 0),
+                        color: (d.close || d.C) >= (d.open || d.O) ? 'rgba(0,200,83,0.5)' : 'rgba(248,81,73,0.5)',
+                    }));
+
+                    klineCandleSeries.setData(candleData);
+                    klineVolumeSeries.setData(volumeData);
+
+                    klineChart.timeScale().fitContent();
+
+                    const latest = data[data.length - 1];
+                    const latestPrice = latest.close || latest.C;
+                    const prevPrice = data.length > 1 ? (data[data.length - 2].close || data[data.length - 2].C) : latestPrice;
+                    const priceChange = ((latestPrice - prevPrice) / prevPrice * 100).toFixed(2);
+
+                    document.getElementById('kline-info').innerHTML =
+                        `<span style="color:${priceChange >= 0 ? '#00c853' : '#f85149'};font-weight:bold;">$${latestPrice?.toFixed(2)}</span> ` +
+                        `<span style="color:${priceChange >= 0 ? '#00c853' : '#f85149'};">(${priceChange >= 0 ? '+' : ''}${priceChange}%)</span> ` +
+                        `<span style="color:#8b949e;margin-left:12px;">${timeframe}</span>`;
+
+                } else {
+                    console.log('数据为空或格式错误:', result);
+                    document.getElementById('kline-info').textContent = '暂无数据: ' + (result.detail || JSON.stringify(result).substring(0, 100));
+                }
+            } catch (e) {
+                console.error('加载K线失败:', e);
+                document.getElementById('kline-info').textContent = '加载失败: ' + e.message;
+            }
+        }
+
+        function parseTimestamp(ts) {
+            if (!ts) return Math.floor(Date.now() / 1000);
+            if (typeof ts === 'number') {
+                // 毫秒转秒
+                if (ts > 1e12) ts = Math.floor(ts / 1000);
+                return ts;
+            }
+            if (typeof ts === 'string') {
+                // ISO 日期字符串转时间戳
+                return Math.floor(new Date(ts).getTime() / 1000);
+            }
+            return Math.floor(Date.now() / 1000);
+        }
+
+        function startKlineAutoRefresh() {
+            stopKlineAutoRefresh();
+            const timeframe = document.getElementById('chart-timeframe').value;
+            const interval = getKlineRefreshInterval(timeframe);
+            loadKlineChart();
+            klineRefreshTimer = setInterval(loadKlineChart, interval);
+        }
+
+        function stopKlineAutoRefresh() {
+            if (klineRefreshTimer) {
+                clearInterval(klineRefreshTimer);
+                klineRefreshTimer = null;
+            }
+        }
+
+        // 模拟交易
+        async function loadSimStatus() {
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/simulator/status');
+                const result = await resp.json();
+                if (result.success) {
+                    const status = result.status;
+                    const pnlColor = (status.total_pnl || 0) >= 0 ? '#00c853' : '#f85149';
+                    document.getElementById('sim-status').innerHTML = `
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-value">$${status.balance?.toFixed(2) || 0}</div>
+                                <div class="stat-label">余额</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color:${pnlColor}">$${status.total_pnl?.toFixed(2) || 0}</div>
+                                <div class="stat-label">总盈亏</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${status.open_positions || 0}</div>
+                                <div class="stat-label">持仓</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${status.total_orders || 0}</div>
+                                <div class="stat-label">订单</div>
+                            </div>
+                        </div>
+                        ${status.auto_trading_enabled ? `<div style="margin-top:8px;font-size:11px;color:#8b949e;">自动交易运行中: ${status.auto_trading_config?.symbol} | 置信度≥${status.auto_trading_config?.confidence_threshold}% | 仓位${status.auto_trading_config?.position_size_pct}% | 止损${status.auto_trading_config?.stop_loss_pct}% | 止盈${status.auto_trading_config?.take_profit_pct}%</div>` : ''}
+                        ${status.positions && status.positions.length > 0 ? '<div style="margin-top:12px;"><strong>当前持仓:</strong><pre style="font-size:11px;max-height:150px;overflow:auto;">' + JSON.stringify(status.positions, null, 2) + '</pre></div>' : ''}
+                    `;
+                }
+            } catch (e) {
+                console.error('获取模拟交易状态失败:', e);
+            }
+        }
+
+        // 自动交易详情
+        let autoDetailInterval = null;
+
+        async function loadAutoTradingDetail() {
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/simulator/auto-trading/detail');
+                const result = await resp.json();
+                if (result.success && result.strategies) {
+                    const strategies = result.strategies;
+                    let html = '';
+
+                    for (const [symbol, data] of Object.entries(strategies)) {
+                        const pnlColor = (data.stats?.total_pnl_pct || 0) >= 0 ? '#00c853' : '#f85149';
+                        const posColor = data.position_opened ? '#00c853' : '#8b949e';
+                        const unrealizedColor = (data.unrealized_pnl_pct || 0) >= 0 ? '#00c853' : '#f85149';
+
+                        html += `
+                            <div style="background:#161b22;border-radius:8px;padding:16px;margin-bottom:12px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                    <h3 style="margin:0;">${symbol}</h3>
+                                    <span style="background:${data.enabled ? '#238636' : '#6e7681'};padding:4px 12px;border-radius:12px;font-size:11px;">
+                                        ${data.enabled ? '运行中' : '已停止'}
+                                    </span>
+                                </div>
+                                <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-bottom:12px;">
+                                    <div style="text-align:center;">
+                                        <div style="font-size:20px;font-weight:bold;">$${result.balance?.toFixed(2) || 0}</div>
+                                        <div style="font-size:11px;color:#8b949e;">余额</div>
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <div style="font-size:20px;font-weight:bold;color:${pnlColor};">${data.stats?.total_pnl_pct || 0}%</div>
+                                        <div style="font-size:11px;color:#8b949e;">总收益率</div>
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <div style="font-size:20px;font-weight:bold;color:${posColor};">${data.position_opened ? '持仓中' : '空仓'}</div>
+                                        <div style="font-size:11px;color:#8b949e;">状态</div>
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <div style="font-size:20px;font-weight:bold;">${data.stats?.win_rate || 0}%</div>
+                                        <div style="font-size:11px;color:#8b949e;">胜率</div>
+                                    </div>
+                                </div>
+                                ${data.position_opened ? `
+                                <div style="background:#0d1117;border-radius:6px;padding:12px;margin-bottom:12px;">
+                                    <div style="font-size:12px;color:#8b949e;margin-bottom:8px;">当前持仓</div>
+                                    <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;font-size:12px;">
+                                        <div>入场价: <span style="color:#1d9bf0;">$${data.entry_price?.toFixed(2) || '-'}</span></div>
+                                        <div>当前价: <span style="color:#1d9bf0;">$${data.current_price?.toFixed(2) || '-'}</span></div>
+                                        <div>最高价: <span style="color:#00c853;">$${data.highest_price?.toFixed(2) || '-'}</span></div>
+                                        <div>浮动盈亏: <span style="color:${unrealizedColor};">${data.unrealized_pnl_pct || 0}%</span></div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:8px;font-size:11px;color:#8b949e;text-align:center;">
+                                    <div>交易${data.stats?.total_trades || 0}笔</div>
+                                    <div>胜${data.stats?.wins || 0}笔</div>
+                                    <div>负${data.stats?.losses || 0}笔</div>
+                                    <div>日盈亏${data.stats?.daily_pnl || 0}%</div>
+                                    <div>总盈亏${data.stats?.total_pnl || 0}%</div>
+                                </div>
+                                <details style="margin-top:12px;">
+                                    <summary style="cursor:pointer;font-size:12px;color:#1d9bf0;">策略配置详情</summary>
+                                    <div style="margin-top:8px;padding:8px;background:#0d1117;border-radius:4px;font-size:11px;">
+                                        <div><strong>风控:</strong> 置信度≥${data.risk_management?.confidence_threshold}% | 仓位${data.risk_management?.position_size_pct}% | 止损${data.risk_management?.stop_loss_pct}% | 止盈${data.risk_management?.take_profit_pct}%</div>
+                                        <div style="margin-top:4px;"><strong>指标:</strong> ${data.strategy_config?.indicators?.join(', ') || '-'}</div>
+                                        <div style="margin-top:4px;"><strong>ATR止损:</strong> ${data.risk_management?.use_atr_stop ? '启用 (倍数' + data.risk_management?.atr_multiplier + ')' : '未启用'} | <strong>追踪止盈:</strong> ${data.risk_management?.trailing_stop_pct || 0}%</div>
+                                        <div style="margin-top:4px;"><strong>保护:</strong> 最大回撤${data.risk_management?.max_drawdown_pct}% | 日亏损${data.risk_management?.max_daily_loss_pct}%</div>
+                                    </div>
+                                </details>
+                                ${data.recent_trades && data.recent_trades.length > 0 ? `
+                                <details style="margin-top:12px;" open>
+                                    <summary style="cursor:pointer;font-size:12px;color:#00c853;">最近交易 (${data.recent_trades.length}笔)</summary>
+                                    <div style="margin-top:8px;max-height:150px;overflow-y:auto;">
+                                        ${data.recent_trades.slice().reverse().map(t => `
+                                            <div style="display:flex;justify-content:space-between;padding:6px 8px;background:#0d1117;border-radius:4px;margin-bottom:4px;font-size:11px;">
+                                                <span>${t.action} ${t.entry_price ? '@$' + t.entry_price.toFixed(2) : ''}</span>
+                                                <span style="color:${(t.pnl_pct || 0) >= 0 ? '#00c853' : '#f85149'};">${t.pnl_pct || 0}%</span>
+                                                <span style="color:#8b949e;">${new Date(t.time).toLocaleString()}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </details>
+                                ` : ''}
+                            </div>
+                        `;
+                    }
+
+                    if (!html) {
+                        html = '<p style="color:#8b949e;text-align:center;">暂无自动交易数据</p>';
+                    }
+
+                    document.getElementById('auto-trading-detail').innerHTML = html;
+                }
+            } catch (e) {
+                console.error('获取自动交易详情失败:', e);
+            }
+        }
+
+        function startAutoDetailPolling() {
+            stopAutoDetailPolling();
+            autoDetailInterval = setInterval(loadAutoTradingDetail, 5000);
+            loadAutoTradingDetail();
+        }
+
+        function stopAutoDetailPolling() {
+            if (autoDetailInterval) {
+                clearInterval(autoDetailInterval);
+                autoDetailInterval = null;
+            }
+        }
+
+        // 获取实时指标
+        async function loadSimIndicators() {
+            const symbol = document.getElementById('sig-symbol').value;
+            const timeframe = document.getElementById('sig-timeframe').value;
+            const el = document.getElementById('sim-indicators');
+            showLoading(el);
+
+            try {
+                const resp = await fetch(API_BASE + `/api/v1/simulator/indicators?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
+                const result = await resp.json();
+
+                if (result.success && result.data) {
+                    const d = result.data;
+                    const trendColor = d.trend === 'bullish' ? '#00c853' : d.trend === 'bearish' ? '#f85149' : '#f0883e';
+                    el.innerHTML = `
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-value">$${d.current_price || 0}</div>
+                                <div class="stat-label">当前价</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color:${trendColor}">${d.trend || 'N/A'}</div>
+                                <div class="stat-label">趋势</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${d.rsi || 'N/A'}</div>
+                                <div class="stat-label">RSI</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${d.macd || 'N/A'}</div>
+                                <div class="stat-label">MACD</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;font-size:12px;">
+                            <div>MA5: ${d.ma5 || 'N/A'} | MA20: ${d.ma20 || 'N/A'} | MA60: ${d.ma60 || 'N/A'}</div>
+                            <div>布林带: ${d.bollinger_lower || 'N/A'} - ${d.bollinger_upper || 'N/A'}</div>
+                            <div>MACD信号: ${d.macd_signal || 'N/A'} | 柱状: ${d.macd_histogram || 'N/A'}</div>
+                        </div>
+                    `;
+                    el.className = 'result success';
+                } else {
+                    el.textContent = '获取指标失败';
+                    el.className = 'result error';
+                }
+            } catch (e) {
+                el.textContent = '错误: ' + e.message;
+                el.className = 'result error';
+            }
+        }
+
+        // 获取 AI 信号
+        async function getAISignal() {
+            const symbol = document.getElementById('sig-symbol').value;
+            const timeframe = document.getElementById('sig-timeframe').value;
+            const el = document.getElementById('sim-ai-signal');
+            showLoading(el);
+
+            try {
+                const resp = await fetch(API_BASE + `/api/v1/simulator/ai-signal?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
+                const result = await resp.json();
+
+                if (result.success && result.signal) {
+                    const s = result.signal;
+                    const actionColor = s.action === 'BUY' ? '#00c853' : s.action === 'SELL' ? '#f85149' : '#f0883e';
+                    el.innerHTML = `
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-value" style="color:${actionColor};font-size:24px;">${s.action || 'HOLD'}</div>
+                                <div class="stat-label">信号</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${s.confidence || 0}%</div>
+                                <div class="stat-label">置信度</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">$${s.entry_price || 0}</div>
+                                <div class="stat-label">入场价</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:8px;font-size:12px;">
+                            <div>止损: $${s.stop_loss || 0} | 止盈: $${s.take_profit || 0}</div>
+                            <div style="margin-top:4px;color:#8b949e;">${s.reason || ''}</div>
+                        </div>
+                    `;
+                    el.className = 'result success';
+                } else {
+                    el.textContent = result.message || '暂无信号';
+                    el.className = 'result';
+                }
+            } catch (e) {
+                el.textContent = '错误: ' + e.message;
+                el.className = 'result error';
+            }
+        }
+
+        // 自动交易
+        // AI策略助手 - 自然语言转配置
+        async function applyStrategyFromDescription() {
+            const description = document.getElementById('strategy-description').value.trim();
+            const symbol = document.getElementById('auto-symbol').value;
+            const timeframe = document.getElementById('auto-timeframe').value;
+            const statusEl = document.getElementById('strategy-desc-status');
+
+            if (!description) {
+                alert('请输入策略描述');
+                return;
+            }
+
+            statusEl.textContent = 'AI分析中...';
+
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/strategy/describe', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ description, symbol, timeframe })
+                });
+                const result = await resp.json();
+
+                if (result.success && result.data) {
+                    const config = result.data;
+
+                    // 填充指标选择
+                    const indicatorsSelect = document.getElementById('auto-indicators');
+                    const targetIndicators = config.indicators || ['rsi', 'macd', 'boll'];
+                    Array.from(indicatorsSelect.options).forEach(opt => {
+                        opt.selected = targetIndicators.includes(opt.value);
+                    });
+
+                    // 填充RSI阈值
+                    if (config.rsi_oversold !== undefined) {
+                        document.getElementById('auto-rsi-oversold').value = config.rsi_oversold;
+                    }
+                    if (config.rsi_overbought !== undefined) {
+                        document.getElementById('auto-rsi-overbought').value = config.rsi_overbought;
+                    }
+
+                    // 填充布林带阈值
+                    if (config.boll_position_low !== undefined) {
+                        document.getElementById('auto-boll-low').value = Math.round(config.boll_position_low * 100);
+                    }
+                    if (config.boll_position_high !== undefined) {
+                        document.getElementById('auto-boll-high').value = Math.round(config.boll_position_high * 100);
+                    }
+
+                    // 填充确认选项
+                    document.getElementById('auto-macd-confirm').checked = config.macd_confirm !== false;
+                    document.getElementById('auto-ma-confirm').checked = config.ma_confirmation !== false;
+                    document.getElementById('auto-kdj-confirm').checked = config.kdj_confirm === true;
+                    document.getElementById('auto-volume-confirm').checked = config.volume_confirm === true;
+
+                    // 填充基础配置
+                    if (config.confidence_threshold !== undefined) {
+                        document.getElementById('auto-confidence').value = config.confidence_threshold;
+                    }
+                    if (config.stop_loss_pct !== undefined) {
+                        document.getElementById('auto-stop-loss').value = config.stop_loss_pct;
+                    }
+                    if (config.take_profit_pct !== undefined) {
+                        document.getElementById('auto-take-profit').value = config.take_profit_pct;
+                    }
+                    if (config.position_size_pct !== undefined) {
+                        document.getElementById('auto-position-size').value = config.position_size_pct;
+                    }
+
+                    // 填充风控配置
+                    document.getElementById('auto-use-atr').checked = config.use_atr_stop === true;
+                    if (config.atr_multiplier !== undefined) {
+                        document.getElementById('auto-atr-mult').value = config.atr_multiplier;
+                    }
+                    if (config.trailing_stop_pct !== undefined) {
+                        document.getElementById('auto-trailing-stop').value = config.trailing_stop_pct;
+                    }
+                    if (config.max_drawdown_pct !== undefined) {
+                        document.getElementById('auto-max-dd').value = config.max_drawdown_pct;
+                    }
+                    if (config.max_daily_loss_pct !== undefined) {
+                        document.getElementById('auto-max-daily-loss').value = config.max_daily_loss_pct;
+                    }
+
+                    statusEl.textContent = '✅ 已应用推荐配置';
+                    if (config.explanation) {
+                        alert('AI推荐配置已应用：\n\n' + config.explanation);
+                    } else {
+                        alert('AI推荐配置已应用！');
+                    }
+                } else {
+                    statusEl.textContent = '分析失败';
+                    alert('AI分析失败: ' + (result.detail || '未知错误'));
+                }
+            } catch (e) {
+                statusEl.textContent = '请求失败';
+                alert('请求失败: ' + e.message);
+            }
+        }
+
+        // 策略回测验证
+        async function runStrategyBacktest() {
+            const symbol = document.getElementById('auto-symbol').value;
+            const timeframe = document.getElementById('auto-timeframe').value;
+            const confidence = parseFloat(document.getElementById('auto-confidence').value);
+            const positionSize = parseFloat(document.getElementById('auto-position-size').value);
+            const stopLoss = parseFloat(document.getElementById('auto-stop-loss').value);
+            const takeProfit = parseFloat(document.getElementById('auto-take-profit').value);
+            const trailingStop = parseFloat(document.getElementById('auto-trailing-stop').value);
+
+            // 收集策略配置
+            const indicatorsSelect = document.getElementById('auto-indicators');
+            const selectedIndicators = Array.from(indicatorsSelect.selectedOptions).map(o => o.value);
+
+            const strategyConfig = {
+                indicators: selectedIndicators,
+                rsi_oversold: parseFloat(document.getElementById('auto-rsi-oversold').value),
+                rsi_overbought: parseFloat(document.getElementById('auto-rsi-overbought').value),
+                boll_position_low: parseFloat(document.getElementById('auto-boll-low').value) / 100,
+                boll_position_high: parseFloat(document.getElementById('auto-boll-high').value) / 100,
+                macd_confirm: document.getElementById('auto-macd-confirm').checked,
+                ma_confirmation: document.getElementById('auto-ma-confirm').checked,
+                kdj_confirm: document.getElementById('auto-kdj-confirm').checked,
+                volume_confirm: document.getElementById('auto-volume-confirm').checked,
+            };
+
+            const backtestBtn = document.getElementById('auto-backtest-btn');
+            backtestBtn.disabled = true;
+            backtestBtn.textContent = '回测中...';
+
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/strategy/backtest-ai', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        symbol,
+                        timeframe,
+                        days: 30,
+                        initial_balance: 10000,
+                        strategy_config: strategyConfig,
+                        confidence_threshold: confidence,
+                        position_size_pct: positionSize,
+                        stop_loss_pct: stopLoss,
+                        take_profit_pct: takeProfit,
+                        trailing_stop_pct: trailingStop,
+                    })
+                });
+                const result = await resp.json();
+
+                if (result.success && result.data) {
+                    const d = result.data.summary;
+                    const panel = document.getElementById('backtest-result-panel');
+                    panel.style.display = 'block';
+
+                    // 显示汇总
+                    const pnlColor = d.total_pnl >= 0 ? '#00c853' : '#f85149';
+                    const winRateColor = d.win_rate >= 50 ? '#00c853' : '#f85149';
+
+                    document.getElementById('backtest-summary').innerHTML = `
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-value" style="color:${pnlColor}">${d.total_pnl >= 0 ? '+' : ''}$${d.total_pnl.toFixed(2)}</div>
+                                <div class="stat-label">总盈亏</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color:${pnlColor}">${d.total_pnl_pct >= 0 ? '+' : ''}${d.total_pnl_pct.toFixed(2)}%</div>
+                                <div class="stat-label">收益率</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color:${winRateColor}">${d.win_rate.toFixed(1)}%</div>
+                                <div class="stat-label">胜率</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${d.total_trades}</div>
+                                <div class="stat-label">交易次数</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color:#f85149">${d.max_drawdown.toFixed(2)}%</div>
+                                <div class="stat-label">最大回撤</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${d.sharpe_ratio.toFixed(2)}</div>
+                                <div class="stat-label">夏普比率</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;font-size:12px;color:#8b949e;">
+                            <span>盈利交易: <b style="color:#00c853">${d.wins}</b></span> |
+                            <span>亏损交易: <b style="color:#f85149">${d.losses}</b></span> |
+                            <span>平均盈利: <b style="color:#00c853">$${d.avg_win.toFixed(2)}</b></span> |
+                            <span>平均亏损: <b style="color:#f85149">$${d.avg_loss.toFixed(2)}</b></span> |
+                            <span>最终余额: <b>$${d.final_balance.toFixed(2)}</b></span>
+                        </div>
+                    `;
+
+                    // 显示交易明细
+                    const trades = d.trades || result.data.trades || [];
+                    if (trades.length > 0) {
+                        let tradesHtml = '<table style="font-size:11px;"><tr><th>时间</th><th>入场价</th><th>出场价</th><th>盈亏%</th><th>盈亏$</th><th>原因</th></tr>';
+                        trades.slice().reverse().forEach(t => {
+                            const pnlPctColor = t.pnl_pct >= 0 ? '#00c853' : '#f85149';
+                            tradesHtml += `<tr>
+                                <td>${(t.exit_time || '').substring(0, 16)}</td>
+                                <td>$${t.entry_price.toFixed(2)}</td>
+                                <td>$${t.exit_price.toFixed(2)}</td>
+                                <td style="color:${pnlPctColor}">${t.pnl_pct >= 0 ? '+' : ''}${t.pnl_pct.toFixed(2)}%</td>
+                                <td style="color:${pnlPctColor}">${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}</td>
+                                <td>${t.reason || '-'}</td>
+                            </tr>`;
+                        });
+                        tradesHtml += '</table>';
+                        document.getElementById('backtest-trades').innerHTML = tradesHtml;
+                    } else {
+                        document.getElementById('backtest-trades').innerHTML = '<p style="color:#8b949e;font-size:12px;">无交易记录</p>';
+                    }
+                } else {
+                    alert('回测失败: ' + (result.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('回测请求失败: ' + e.message);
+            } finally {
+                backtestBtn.disabled = false;
+                backtestBtn.textContent = '📊 回测验证';
+            }
+        }
+
+        async function startAutoTrading() {
+            const symbol = document.getElementById('auto-symbol').value;
+            const timeframe = document.getElementById('auto-timeframe').value;
+            const confidence = parseFloat(document.getElementById('auto-confidence').value);
+            const positionSize = parseFloat(document.getElementById('auto-position-size').value);
+            const stopLoss = parseFloat(document.getElementById('auto-stop-loss').value);
+            const takeProfit = parseFloat(document.getElementById('auto-take-profit').value);
+
+            // 收集策略配置
+            const indicatorsSelect = document.getElementById('auto-indicators');
+            const selectedIndicators = Array.from(indicatorsSelect.selectedOptions).map(o => o.value);
+
+            const strategyConfig = {
+                indicators: selectedIndicators,
+                rsi_oversold: parseFloat(document.getElementById('auto-rsi-oversold').value),
+                rsi_overbought: parseFloat(document.getElementById('auto-rsi-overbought').value),
+                boll_position_low: parseFloat(document.getElementById('auto-boll-low').value) / 100,
+                boll_position_high: parseFloat(document.getElementById('auto-boll-high').value) / 100,
+                macd_confirm: document.getElementById('auto-macd-confirm').checked,
+                ma_confirmation: document.getElementById('auto-ma-confirm').checked,
+                kdj_confirm: document.getElementById('auto-kdj-confirm').checked,
+                volume_confirm: document.getElementById('auto-volume-confirm').checked,
+            };
+
+            // 风控配置
+            const useAtrStop = document.getElementById('auto-use-atr').checked;
+            const atrMult = parseFloat(document.getElementById('auto-atr-mult').value);
+            const trailingStop = parseFloat(document.getElementById('auto-trailing-stop').value);
+            const maxDD = parseFloat(document.getElementById('auto-max-dd').value);
+            const maxDailyLoss = parseFloat(document.getElementById('auto-max-daily-loss').value);
+
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/simulator/auto-trading/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        symbol,
+                        timeframe,
+                        confidence_threshold: confidence,
+                        position_size_pct: positionSize,
+                        stop_loss_pct: stopLoss,
+                        take_profit_pct: takeProfit,
+                        strategy_config: strategyConfig,
+                        use_atr_stop: useAtrStop,
+                        atr_multiplier: atrMult,
+                        trailing_stop_pct: trailingStop,
+                        max_drawdown_pct: maxDD,
+                        max_daily_loss_pct: maxDailyLoss
+                    })
+                });
+                const result = await resp.json();
+
+                if (result.success) {
+                    document.getElementById('auto-start-btn').style.display = 'none';
+                    document.getElementById('auto-stop-btn').style.display = 'inline-block';
+                    document.getElementById('auto-trading-status').textContent = '运行中';
+                    document.getElementById('auto-trading-status').style.color = '#00c853';
+                    loadSimStatus();
+                    startAutoStatusPolling();
+                    startAutoDetailPolling();
+                } else {
+                    alert('启动失败: ' + (result.detail || result.error));
+                }
+            } catch (e) {
+                alert('错误: ' + e.message);
+            }
+        }
+
+        async function stopAutoTrading() {
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/simulator/auto-trading/stop', { method: 'POST' });
+                const result = await resp.json();
+
+                if (result.success) {
+                    document.getElementById('auto-start-btn').style.display = 'inline-block';
+                    document.getElementById('auto-stop-btn').style.display = 'none';
+                    document.getElementById('auto-trading-status').textContent = '已停止';
+                    document.getElementById('auto-trading-status').style.color = '#8b949e';
+                    stopAutoStatusPolling();
+                    stopAutoDetailPolling();
+                    loadTradeHistory();
+                    loadAutoTradingDetail();
+                }
+            } catch (e) {
+                alert('错误: ' + e.message);
+            }
+        }
+
+        let autoStatusTimer = null;
+        function startAutoStatusPolling() {
+            stopAutoStatusPolling();
+            loadTradeHistory();
+            autoStatusTimer = setInterval(loadTradeHistory, 10000);
+        }
+        function stopAutoStatusPolling() {
+            if (autoStatusTimer) {
+                clearInterval(autoStatusTimer);
+                autoStatusTimer = null;
+            }
+        }
+
+        async function loadTradeHistory() {
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/simulator/status');
+                const result = await resp.json();
+                if (result.success) {
+                    const history = result.status.auto_trade_history || [];
+                    const container = document.getElementById('trade-history');
+                    if (history.length === 0) {
+                        container.innerHTML = '<p style="color:#8b949e;font-size:12px;">暂无交易记录</p>';
+                    } else {
+                        let html = `<table style="font-size:12px;">
+                            <tr>
+                                <th>时间</th>
+                                <th>交易对</th>
+                                <th>操作</th>
+                                <th>入场价</th>
+                                <th>出场价</th>
+                                <th>盈亏</th>
+                            </tr>`;
+                        history.slice().reverse().forEach(t => {
+                            const pnlColor = t.pnl_pct >= 0 ? '#00c853' : '#f85149';
+                            html += `<tr>
+                                <td>${t.time ? t.time.substring(0, 16) : ''}</td>
+                                <td>${t.symbol}</td>
+                                <td>${t.action}</td>
+                                <td>${t.entry_price ? '$' + t.entry_price.toFixed(2) : '-'}</td>
+                                <td>${t.exit_price ? '$' + t.exit_price.toFixed(2) : '-'}</td>
+                                <td style="color:${pnlColor}">${t.pnl_pct >= 0 ? '+' : ''}${t.pnl_pct.toFixed(2)}%</td>
+                            </tr>`;
+                        });
+                        html += '</table>';
+                        container.innerHTML = html;
+                    }
+                }
+            } catch (e) {
+                console.error('加载交易记录失败:', e);
+            }
+        }
+
+        async function simBuy() {
+            const symbol = document.getElementById('sim-symbol').value;
+            const amount = parseFloat(document.getElementById('sim-amount').value);
+            const price = parseFloat(document.getElementById('sim-price').value);
+            const orderType = document.getElementById('sim-order-type').value;
+            const limitPrice = orderType === 'limit' ? parseFloat(document.getElementById('sim-limit-price').value) : null;
+
+            if (!symbol || !amount || !price) {
+                alert('请填写完整信息');
+                return;
+            }
+
+            const data = {
+                symbol, side: 'buy', amount, current_price: price,
+                order_type: orderType
+            };
+            if (limitPrice) data.limit_price = limitPrice;
+
+            const resp = await fetch(API_BASE + '/api/v1/simulator/order', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json();
+            alert(result.success ? '买入成功' : '买入失败: ' + (result.detail || result.error));
+            if (result.success) loadSimStatus();
+        }
+
+        async function simSell() {
+            const symbol = document.getElementById('sim-symbol').value;
+            const amount = parseFloat(document.getElementById('sim-amount').value);
+            const price = parseFloat(document.getElementById('sim-price').value);
+            const orderType = document.getElementById('sim-order-type').value;
+            const limitPrice = orderType === 'limit' ? parseFloat(document.getElementById('sim-limit-price').value) : null;
+
+            if (!symbol || !amount || !price) {
+                alert('请填写完整信息');
+                return;
+            }
+
+            const data = {
+                symbol, side: 'sell', amount, current_price: price,
+                order_type: orderType
+            };
+            if (limitPrice) data.limit_price = limitPrice;
+
+            const resp = await fetch(API_BASE + '/api/v1/simulator/order', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json();
+            alert(result.success ? '卖出成功' : '卖出失败: ' + (result.detail || result.error));
+            if (result.success) loadSimStatus();
+        }
+
+        async function simClose() {
+            const symbol = document.getElementById('sim-symbol').value;
+            const price = parseFloat(document.getElementById('sim-price').value);
+
+            if (!symbol || !price) {
+                alert('请填写交易对和价格');
+                return;
+            }
+
+            const resp = await fetch(API_BASE + '/api/v1/simulator/close', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({symbol, current_price: price, reason: 'manual'})
+            });
+            const result = await resp.json();
+            alert(result.success ? '平仓成功' : '平仓失败: ' + (result.detail || result.error));
+            if (result.success) loadSimStatus();
+        }
+
+        async function simReset() {
+            if (!confirm('确定要重置模拟交易吗？')) return;
+            const resp = await fetch(API_BASE + '/api/v1/simulator/reset', {
+                method: 'POST'
+            });
+            const result = await resp.json();
+            alert(result.success ? '重置成功' : '重置失败');
+            if (result.success) loadSimStatus();
+        }
+
+        async function getSnapshot() {
+            const input = document.getElementById('snapshot-input').value;
+            try {
+                const strategy = JSON.parse(input);
+                const resp = await fetch(API_BASE + '/api/v1/strategy/snapshot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({strategy})
+                });
+                const result = await resp.json();
+                const el = document.getElementById('snapshot-result');
+                if (result.success) {
+                    el.innerHTML = '<pre style="text-align:left;">' + JSON.stringify(result.data, null, 2) + '</pre>';
+                    el.style.display = 'block';
+                    el.className = 'result success';
+                } else {
+                    el.innerHTML = '解析失败: ' + (result.detail || result.error);
+                    el.style.display = 'block';
+                    el.className = 'result error';
+                }
+            } catch (e) {
+                alert('JSON格式错误: ' + e.message);
+            }
+        }
+
+        // 持仓监控
+        let monitorRunning = false;
+
+        async function addMonitor() {
+            const symbol = document.getElementById('mon-symbol').value;
+            const side = document.getElementById('mon-side').value;
+            const entry = parseFloat(document.getElementById('mon-entry').value);
+            const stoploss = parseFloat(document.getElementById('mon-stoploss').value);
+            const takeprofit = parseFloat(document.getElementById('mon-takeprofit').value);
+
+            if (!symbol || !entry) {
+                alert('请填写完整信息');
+                return;
+            }
+
+            const resp = await fetch(API_BASE + '/api/v1/monitor/add?' + new URLSearchParams({
+                symbol, side, entry_price: entry, stop_loss_pct: stoploss, take_profit_pct: takeprofit
+            }), { method: 'POST' });
+
+            const result = await resp.json();
+            const el = document.getElementById('mon-result');
+
+            if (result.success) {
+                el.textContent = '已添加监控: ' + symbol;
+                el.className = 'result success';
+            } else {
+                el.textContent = '添加失败: ' + (result.detail || result.error);
+                el.className = 'result error';
+            }
+            el.style.display = 'block';
+        }
+
+        async function toggleMonitorService() {
+            const action = monitorRunning ? 'stop' : 'start';
+            const resp = await fetch(API_BASE + `/api/v1/monitor/${action}`, { method: 'POST' });
+            const result = await resp.json();
+
+            if (result.success) {
+                monitorRunning = !monitorRunning;
+                document.getElementById('mon-service-status').textContent =
+                    monitorRunning ? '停止监控服务' : '启动监控服务';
+                alert(result.message);
+            } else {
+                alert('操作失败: ' + (result.detail || result.error));
+            }
+        }
+
+        async function loadMonitorStatus() {
+            // 简单检查监控服务是否在运行
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/simulator/status');
+                if (resp.ok) {
+                    document.getElementById('mon-service-status').textContent = '启动监控服务';
+                }
+            } catch (e) {}
+        }
+
+        // 订单类型切换
+        document.getElementById('sim-order-type').addEventListener('change', function() {
+            document.getElementById('sim-limit-price-group').style.display =
+                this.value === 'limit' ? 'block' : 'none';
+        });
+
+        // 模拟交易区加载时获取状态
+        const originalShowSection = showSection;
+        showSection = function(name) {
+            originalShowSection(name);
+            if (name === 'simulator') {
+                loadSimStatus();
+                loadAutoTradingDetail();
+            } else {
+                stopKlineAutoRefresh(); // 离开时停止
+            }
+        };
+
+        // 页面加载时连接WebSocket并开始通知轮询
+        document.addEventListener('DOMContentLoaded', function() {
+            connectWebSocket();
+            startNotifPolling();
+        });
+
+        // 通知相关
+        let notifPollingTimer = null;
+
+        async function loadNotifications() {
+            try {
+                const resp = await fetch(API_BASE + '/api/v1/notifications?limit=20');
+                const result = await resp.json();
+                if (result.success) {
+                    updateNotificationUI(result.data, result.unread_count);
+                }
+            } catch (e) {
+                console.error('获取通知失败:', e);
+            }
+        }
+
+        function updateNotificationUI(notifications, unreadCount) {
+            // 更新 badge
+            const badge = document.getElementById('notif-badge');
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                badge.style.display = 'block';
+            } else {
+                badge.style.display = 'none';
+            }
+
+            // 更新列表
+            const list = document.getElementById('notif-list');
+            if (!notifications || notifications.length === 0) {
+                list.innerHTML = '<div style="padding:24px;text-align:center;color:#8b949e;">暂无通知</div>';
+                return;
+            }
+
+            list.innerHTML = notifications.map(n => `
+                <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="markRead(${n.id})">
+                    <div class="notif-time">${formatTime(n.created_at)}</div>
+                    ${n.symbol ? `<div class="notif-symbol">${n.symbol}</div>` : ''}
+                    <div class="notif-message">${n.message || n.title || ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function formatTime(isoString) {
+            if (!isoString) return '';
+            // 如果没有时区信息，假设是本地时间
+            let d = new Date(isoString);
+            // Safari 不支持没有 T 的日期字符串
+            if (isNaN(d.getTime()) && isoString.includes(' ')) {
+                // 把空格换成 T
+                d = new Date(isoString.replace(' ', 'T'));
+            }
+            // 强制作为本地时间处理
+            if (isNaN(d.getTime())) {
+                // 尝试解析 ISO 格式
+                const parts = isoString.match(/(\d+)/g);
+                if (parts && parts.length >= 6) {
+                    d = new Date(parts[0], parts[1]-1, parts[2], parts[3], parts[4], parts[5]);
+                }
+            }
+            const now = new Date();
+            const diff = (now - d) / 1000;
+
+            if (diff < 60) return '刚刚';
+            if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+            if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+            return d.toLocaleString('zh-CN', { hour12: false });
+        }
+
+        function toggleNotificationDropdown() {
+            const dropdown = document.getElementById('notif-dropdown');
+            dropdown.classList.toggle('show');
+            if (dropdown.classList.contains('show')) {
+                loadNotifications();
+            }
+        }
+
+        async function markRead(id) {
+            try {
+                await fetch(API_BASE + `/api/v1/notifications/${id}/read`, { method: 'POST' });
+                loadNotifications();
+            } catch (e) {
+                console.error('标记已读失败:', e);
+            }
+        }
+
+        async function markAllRead() {
+            try {
+                await fetch(API_BASE + '/api/v1/notifications/read-all', { method: 'POST' });
+                loadNotifications();
+            } catch (e) {
+                console.error('标记全部已读失败:', e);
+            }
+        }
+
+        // 点击外部关闭通知下拉
+        document.addEventListener('click', function(e) {
+            const bell = document.querySelector('.notification-bell');
+            const dropdown = document.getElementById('notif-dropdown');
+            if (!bell.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+
+        // 启动通知轮询（每30秒）
+        function startNotifPolling() {
+            loadNotifications();
+            notifPollingTimer = setInterval(loadNotifications, 30000);
+        }
+
+        // 默认显示分析
+        showSection('analyze');
+    </script>
+</body>
+</html>

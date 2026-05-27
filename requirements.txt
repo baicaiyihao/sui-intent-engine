@@ -1,0 +1,23 @@
+# SuiIntent Guardian Requirements
+
+# Core
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+
+# SUI SDK
+sui-sdk>=0.1.0
+
+# AI / LLM
+minimax-api>=0.1.0
+
+# Data
+pandas>=2.0.0
+numpy>=1.24.0
+requests>=2.31.0
+
+# Storage
+walrus-sdk>=0.1.0
+
+# Utils
+python-dotenv>=1.0.0

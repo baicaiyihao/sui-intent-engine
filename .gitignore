@@ -1,0 +1,38 @@
+# Images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.svg
+
+# Sensitive files
+config.json
+*.key
+*.pem
+.env
+.mcp.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+node_modules/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test/Script files with private keys
+scripts/config.json
+scripts/*.ts

@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuiIntent Engine</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+        }
+
+        .main-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 16px;
+            font-size: 1rem;
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        textarea::placeholder {
+            color: #666;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        button {
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-execute {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            color: #000;
+        }
+
+        .btn-execute:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn-execute:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .results {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .result-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-card h3 {
+            color: #00d4ff;
+            margin-bottom: 16px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .result-card h3::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: #00d4ff;
+            border-radius: 2px;
+        }
+
+        .result-content {
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .result-content .label {
+            color: #888;
+            display: inline-block;
+            width: 100px;
+        }
+
+        .result-content .value {
+            color: #fff;
+        }
+
+        .risk-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .risk-low { background: #00ff88; color: #000; }
+        .risk-medium { background: #ffaa00; color: #000; }
+        .risk-high { background: #ff6600; color: #fff; }
+        .risk-critical { background: #ff0044; color: #fff; }
+
+        .ptb-commands {
+            margin-top: 16px;
+        }
+
+        .ptb-command {
+            background: rgba(0, 212, 255, 0.1);
+            border-left: 3px solid #00d4ff;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .ptb-command .cmd-name {
+            font-weight: 600;
+            color: #00d4ff;
+        }
+
+        .ptb-command .cmd-desc {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        .status-bar {
+            text-align: center;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status-bar.success {
+            border: 1px solid #00ff88;
+        }
+
+        .status-bar.error {
+            border: 1px solid #ff4444;
+            color: #ff4444;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #00d4ff;
+        }
+
+        .loading::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .risk-overview {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .risk-checks-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 12px 0;
+        }
+
+        .risk-check {
+            display: grid;
+            grid-template-columns: 24px 80px 60px 1fr;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .risk-check.status-pass {
+            background: rgba(0, 255, 136, 0.1);
+            border-left: 3px solid #00ff88;
+        }
+
+        .risk-check.status-warn {
+            background: rgba(255, 170, 0, 0.1);
+            border-left: 3px solid #ffaa00;
+        }
+
+        .risk-check.status-fail {
+            background: rgba(255, 0, 68, 0.1);
+            border-left: 3px solid #ff0044;
+        }
+
+        .check-icon {
+            font-weight: bold;
+        }
+
+        .status-pass .check-icon { color: #00ff88; }
+        .status-warn .check-icon { color: #ffaa00; }
+        .status-fail .check-icon { color: #ff0044; }
+
+        .check-indicator {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .check-value {
+            color: #00d4ff;
+            font-family: monospace;
+        }
+
+        .check-message {
+            color: #aaa;
+            font-size: 0.8rem;
+        }
+
+        .risk-summary {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.9rem;
+        }
+
+        .execution-result {
+            margin-top: 16px;
+            padding: 16px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            border-radius: 8px;
+        }
+
+        .execution-result.error {
+            background: rgba(255, 0, 68, 0.1);
+            border-color: #ff0044;
+        }
+
+        .execution-result .tx-hash {
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #888;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SuiIntent Engine</h1>
+            <p class="subtitle">SUI Intent-driven Trading Interface</p>
+        </header>
+
+        <div class="main-panel">
+            <div class="input-section">
+                <textarea
+                    id="intentInput"
+                    placeholder="输入你的交易意图，例如：RSI < 30 时买入 100 美金 SUI，止损 2%"
+                >RSI < 30 时买入 100 美金 SUI，止损 2%</textarea>
+                <div class="button-row">
+                    <button class="btn-primary" onclick="executeIntent()">Parse & Preview</button>
+                    <button class="btn-secondary" onclick="clearAll()">Clear</button>
+                </div>
+            </div>
+
+            <div id="statusBar" class="status-bar hidden"></div>
+
+            <div id="loadingIndicator" class="loading hidden">Processing</div>
+
+            <div id="results" class="results hidden">
+                <div class="result-card">
+                    <h3>Parsed Intent</h3>
+                    <div id="intentResult" class="result-content"></div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Risk Assessment</h3>
+                    <div id="riskResult" class="result-content"></div>
+                </div>
+
+                <div class="result-card" style="grid-column: 1 / -1;">
+                    <h3>PTB Preview</h3>
+                    <div id="ptbResult"></div>
+                    <div class="button-row" style="margin-top: 20px;">
+                        <button id="executeBtn" class="btn-execute" onclick="confirmExecute()">Confirm & Execute</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080';
+
+        let currentData = null;
+
+        async function executeIntent() {
+            const text = document.getElementById('intentInput').value.trim();
+            if (!text) {
+                showStatus('Please enter an intent', 'error');
+                return;
+            }
+
+            showLoading(true);
+            hideResults();
+
+            try {
+                // Use the combined execute-preview endpoint (POST)
+                const response = await fetch(`${API_BASE}/intent/execute-preview`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, use_llm: true, current_price: 2.0 })
+                });
+
+                const data = await response.json();
+                currentData = data;
+
+                if (data.success) {
+                    displayResults(data);
+                    showStatus('Intent parsed and preview generated successfully', 'success');
+                } else {
+                    showStatus(data.error || 'Failed to parse intent', 'error');
+                }
+            } catch (error) {
+                // Fallback: try parsing first, then preview separately
+                try {
+                    const parseRes = await fetch(`${API_BASE}/intent/parse`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text, use_llm: true })
+                    });
+                    const parseData = await parseRes.json();
+
+                    if (parseData.success) {
+                        // Get preview
+                        const intent = parseData.intent;
+                        const previewRes = await fetch(`${API_BASE}/intent/preview?action=${intent.action}&asset=${intent.asset}&amount_usd=${intent.amount_usd}&current_price=2.0`);
+                        const previewData = await previewRes.json();
+
+                        // Get risk check with mock indicators
+                        const riskRes = await fetch(`${API_BASE}/intent/risk-check`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                intent: intent,
+                                indicators: {
+                                    rsi: 25.0,
+                                    macd_histogram: 0.5,
+                                    macd: 0.1,
+                                    macd_signal: -0.05,
+                                    boll_position: 0.15,
+                                    kdj_k: 20.0,
+                                    kdj_d: 25.0,
+                                    kdj_j: 10.0,
+                                    volume_ratio: 1.2,
+                                    adx: 30.0
+                                }
+                            })
+                        });
+                        const riskData = await riskRes.json();
+
+                        currentData = {
+                            success: true,
+                            intent: intent,
+                            human_readable: parseData.human_readable,
+                            risk_report: riskData.risk_report,
+                            ptb_preview: previewData.preview
+                        };
+                        displayResults(currentData);
+                        showStatus('Intent parsed successfully', 'success');
+                    } else {
+                        showStatus(parseData.error || 'Failed to parse intent', 'error');
+                    }
+                } catch (e) {
+                    showStatus('API server not running. Please start: python sui_intent_main.py server', 'error');
+                }
+            }
+
+            showLoading(false);
+        }
+
+        async function confirmExecute() {
+            if (!currentData || !currentData.intent) {
+                showStatus('No valid intent to execute', 'error');
+                return;
+            }
+
+            if (currentData.risk_report && !currentData.risk_report.can_proceed) {
+                showStatus('Risk check failed. Execution blocked.', 'error');
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                const response = await fetch(`${API_BASE}/intent/confirm`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        intent: currentData.intent,
+                        risk_report: currentData.risk_report,
+                        current_price: 2.0
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus(`Order executed successfully!`, 'success');
+                    // Display execution result
+                    const execResult = `
+                        <div class="execution-result">
+                            <h4 style="color: #00ff88; margin-bottom: 12px;">Execution Successful</h4>
+                            <p><span class="label">Order ID:</span> <span class="value">${result.order_id || 'N/A'}</span></p>
+                            <p><span class="label">Executed Price:</span> <span class="value">$${result.executed_price?.toFixed(4) || 'N/A'}</span></p>
+                            <p><span class="label">Executed Amount:</span> <span class="value">${result.executed_amount?.toFixed(6) || 'N/A'} ${currentData.intent.asset || 'SUI'}</span></p>
+                            <p><span class="label">Slippage:</span> <span class="value">${result.slippage?.toFixed(2) || '0'}%</span></p>
+                            <p><span class="label">Fees:</span> <span class="value">$${result.fees?.toFixed(4) || '0'}</span></p>
+                            <p><span class="label">TX Hash:</span></p>
+                            <div class="tx-hash">${result.tx_hash || 'N/A'}</div>
+                            <p style="margin-top: 12px;"><span class="label">Message:</span> <span class="value">${result.message || 'Order completed'}</span></p>
+                        </div>
+                    `;
+                    document.getElementById('ptbResult').innerHTML = execResult + document.getElementById('ptbResult').innerHTML;
+                    // Disable execute button after successful execution
+                    const execBtn = document.getElementById('executeBtn');
+                    if (execBtn) {
+                        execBtn.disabled = true;
+                        execBtn.textContent = 'Executed';
+                    }
+                } else {
+                    showStatus(result.error || 'Execution failed', 'error');
+                    const execResult = `
+                        <div class="execution-result error">
+                            <h4 style="color: #ff0044; margin-bottom: 12px;">Execution Failed</h4>
+                            <p><span class="label">Error:</span> <span class="value">${result.error || 'Unknown error'}</span></p>
+                            <p><span class="label">Message:</span> <span class="value">${result.message || 'N/A'}</span></p>
+                        </div>
+                    `;
+                    document.getElementById('ptbResult').innerHTML = execResult + document.getElementById('ptbResult').innerHTML;
+                }
+            } catch (error) {
+                showStatus('Execution failed. API server may not be running.', 'error');
+            }
+
+            showLoading(false);
+        }
+
+        function displayResults(data) {
+            // Intent
+            const intent = data.intent;
+            const intentHtml = `
+                <p><span class="label">Action:</span> <span class="value">${intent.action?.toUpperCase() || 'N/A'}</span></p>
+                <p><span class="label">Asset:</span> <span class="value">${intent.asset || 'SUI'}</span></p>
+                <p><span class="label">Amount:</span> <span class="value">$${intent.amount_usd || 100}</span></p>
+                <p><span class="label">Stop Loss:</span> <span class="value">${intent.stop_loss_pct || 2}%</span></p>
+                <p><span class="label">Take Profit:</span> <span class="value">${intent.take_profit_pct || 6}%</span></p>
+                ${intent.trigger ? `
+                <p><span class="label">Trigger:</span> <span class="value">${intent.trigger.indicator} ${intent.trigger.condition} ${intent.trigger.threshold}</span></p>
+                ` : ''}
+                ${data.human_readable ? `
+                <div style="margin-top: 12px; padding: 10px; background: rgba(0,212,255,0.1); border-radius: 8px; font-size: 0.85rem;">
+                    <strong style="color: #00d4ff;">Human Readable:</strong><br>
+                    ${data.human_readable.replace(/\n/g, '<br>')}
+                </div>
+                ` : ''}
+            `;
+            document.getElementById('intentResult').innerHTML = intentHtml;
+
+            // Risk - Enhanced display with all 6 indicators
+            const risk = data.risk_report;
+            if (risk) {
+                const riskClass = `risk-${risk.risk_level}`;
+                const checks = risk.checks || [];
+
+                let indicatorsHtml = '';
+                const indicatorIcons = {
+                    'RSI': '📊',
+                    'MACD': '📈',
+                    'Bollinger': '📉',
+                    'KDJ': '🎯',
+                    'Volume': '📊',
+                    'ADX': '💪'
+                };
+
+                checks.forEach(check => {
+                    const icon = indicatorIcons[check.indicator] || '•';
+                    const statusClass = check.status === 'pass' ? 'status-pass' : (check.status === 'warn' ? 'status-warn' : 'status-fail');
+                    const statusIcon = check.status === 'pass' ? '✓' : (check.status === 'warn' ? '⚠' : '✗');
+                    indicatorsHtml += `
+                        <div class="risk-check ${statusClass}">
+                            <span class="check-icon">${statusIcon}</span>
+                            <span class="check-indicator">${icon} ${check.indicator}</span>
+                            <span class="check-value">${check.value !== null ? check.value.toFixed(2) : 'N/A'}</span>
+                            <span class="check-message">${check.message}</span>
+                        </div>
+                    `;
+                });
+
+                const riskHtml = `
+                    <div class="risk-overview">
+                        <span class="label">Risk Level:</span>
+                        <span class="risk-indicator ${riskClass}">${risk.risk_level?.toUpperCase() || 'UNKNOWN'}</span>
+                        <span class="label" style="margin-left: 16px;">Score:</span>
+                        <span class="value">${risk.risk_score || 0}</span>
+                    </div>
+                    <div class="risk-checks-container">
+                        ${indicatorsHtml}
+                    </div>
+                    <div class="risk-summary">
+                        <span class="label">Can Proceed:</span>
+                        <span class="value" style="color: ${risk.can_proceed ? '#00ff88' : '#ff4444'};">${risk.can_proceed ? 'Yes' : 'No'}</span>
+                        <br>
+                        <span class="label">Recommendation:</span>
+                        <span class="value">${risk.recommendation || 'N/A'}</span>
+                    </div>
+                `;
+                document.getElementById('riskResult').innerHTML = riskHtml;
+
+                // Disable execute button if risk check fails
+                if (!risk.can_proceed) {
+                    const execBtn = document.getElementById('executeBtn');
+                    if (execBtn) {
+                        execBtn.disabled = true;
+                        execBtn.title = 'Risk check failed - execution blocked';
+                    }
+                }
+            }
+
+            // PTB Preview
+            const preview = data.ptb_preview;
+            if (preview) {
+                const previewHtml = `
+                    <p><span class="label">Est. Amount:</span> <span class="value">${preview.estimated_amount?.toFixed(6) || 0} ${preview.asset || 'SUI'}</span></p>
+                    <p><span class="label">Est. Price:</span> <span class="value">$${preview.estimated_price?.toFixed(4) || 0}</span></p>
+                    <p><span class="label">Est. Slippage:</span> <span class="value">${preview.estimated_slippage || 'N/A'}</span></p>
+                    <p><span class="label">Est. Fees:</span> <span class="value">${preview.estimated_fees || 'N/A'}</span></p>
+
+                    <div class="ptb-commands">
+                        <strong style="color: #888;">PTB Commands:</strong>
+                        ${(preview.ptb_commands || []).map(cmd => `
+                            <div class="ptb-command">
+                                <div class="cmd-name">${cmd.index}. ${cmd.command}</div>
+                                <div class="cmd-desc">${cmd.description}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                document.getElementById('ptbResult').innerHTML = previewHtml;
+            }
+
+            showResults();
+        }
+
+        function showStatus(message, type) {
+            const bar = document.getElementById('statusBar');
+            bar.textContent = message;
+            bar.className = `status-bar ${type}`;
+            bar.classList.remove('hidden');
+        }
+
+        function showLoading(show) {
+            const el = document.getElementById('loadingIndicator');
+            if (show) {
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        function showResults() {
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        function hideResults() {
+            document.getElementById('results').classList.add('hidden');
+        }
+
+        function clearAll() {
+            document.getElementById('intentInput').value = '';
+            document.getElementById('statusBar').classList.add('hidden');
+            hideResults();
+            currentData = null;
+        }
+    </script>
+</body>
+</html>
