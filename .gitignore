@@ -8,11 +8,17 @@
 *.svg
 
 # Sensitive files
-config.json
 *.key
 *.pem
 .env
 .mcp.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite
 
 # Logs
 *.log
@@ -33,6 +39,12 @@ build/
 *.swp
 *.swo
 
-# Test/Script files with private keys
-scripts/config.json
-scripts/*.ts
+# Scripts with private keys (all test/debug scripts)
+src/frontend/scripts/*.ts
+src/frontend/scripts/config.json
+
+# Sensitive documentation
+**/CLAUDE.md
+**/SUI_DEEPBOOK_KB.md
+**/.mcp.json
+
