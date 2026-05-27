@@ -4,52 +4,37 @@
 
 ## 项目简介
 
-**SUI Intent Engine** 是一个基于自然语言的 DeFi 交易意图引擎，用户用日常语言描述交易目标，系统解析为 SUI PTB 交易，在 DeepBook V3 订单簿上执行。
+**SUI Intent Engine** 是一个基于自然语言的 DeFi 交易意图引擎，集成 SUI 原生订单簿 DeepBook V3，提供实时市场数据可视化和 AI 辅助交易功能。
 
 ## 核心功能
 
-1. **自然语言意图解析** - "RSI 低于 30 的时候买入 100 美金 SUI"
-2. **Guardian 风险检查** - RSI/MACD/KDJ/布林带多维度检查
-3. **人类可读预览** - 执行前完整展示交易细节
-4. **DeepBook V3 执行** - SUI 原生订单簿
-5. **实时市场数据** - K线、订单簿、Ticker
-
-## 技术架构
-
-```
-用户输入 → Intent Parser → Guardian → PTB Builder → User Confirm → DeepBook → Walrus
-```
-
-## 快速开始
-
-```bash
-# 克隆项目
-git clone <repo-url>
-cd sui-intent-engine
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 运行服务
-python -m src.api
-```
+1. **自然语言交易** - 用日常语言描述交易需求
+2. **实时市场数据** - K线图、订单簿、Ticker
+3. **DeepBook V3 交易** - SUI 原生订单簿执行
+4. **AI 策略分析** - 技术指标和信号分析
 
 ## 项目结构
 
 ```
 sui-intent-engine/
-├── docs/
-│   ├── PROJECT_PLAN.md      # 项目计划书
-│   └── README.md            # 本文件
+├── docs/                       # 技术文档
+│   ├── deepbookv3/            # DeepBook V3 合约文档
+│   ├── deepbookv3-sdk/        # DeepBook SDK 文档
+│   ├── deepbook-margin/       # Margin 交易文档
+│   └── DEEPBOOK_TUTORIAL.md   # DeepBook 入门指南
 ├── src/
-│   ├── intent_parser.py      # 意图解析
-│   ├── guardian.py           # 风险检查
-│   ├── ptb_builder.py       # PTB 构建
-│   ├── deepbook_client.py   # DeepBook 交互
-│   ├── walrus_client.py     # Walrus 存证
-│   └── api.py               # API 接口
-├── tests/
-└── config/
+│   ├── frontend/               # React 前端
+│   │   └── src/components/    # UI 组件
+│   │       ├── MarketChart.tsx    # K线图
+│   │       ├── OrderBook.tsx      # 订单簿
+│   │       ├── TradingPage.tsx    # 交易页面
+│   │       └── AIChatPage.tsx     # AI 对话
+│   ├── sui/                   # SUI DeepBook 集成
+│   │   ├── deepbook_client.py    # DeepBook 客户端
+│   │   ├── deepbook_cache.py     # 市场数据缓存
+│   │   └── deepbook_indexer.py   # 数据索引
+│   ├── server.py              # FastAPI 服务
+│   └── sui_intent_server.py   # SUI Intent API
 ```
 
 ## 技术栈
@@ -62,11 +47,29 @@ sui-intent-engine/
 | 链交互 | SUI SDK |
 | 订单簿 | DeepBook V3 |
 | 市场数据 | DeepBook V3 Indexer |
-| 存储 | Walrus |
 
-## 联系方式
+## DeepBook V3 主网配置
 
-[团队联系方式]
+| 参数 | 值 |
+|------|-----|
+| Package | `0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809` |
+| Registry | `0xaf16199a2dff736e9f07a845f23c5da6df6f756eddb631aed9d24a93efc4549d` |
+| SUI_USDC Pool | `0xe05dafb5133bcffb8d59f4e12465dc0e9faeaa05e3e342a08fe135800e3e4407` |
+
+## 快速开始
+
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 启动后端
+python -m src.sui_intent_server
+
+# 启动前端
+cd src/frontend
+npm install
+npm run dev
+```
 
 ## License
 
