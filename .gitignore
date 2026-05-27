@@ -43,6 +43,9 @@ build/
 src/frontend/scripts/*.ts
 src/frontend/scripts/config.json
 
+# Claude Code context (local development only)
+CLAUDE.md
+
 # Sensitive documentation
 **/SUI_DEEPBOOK_KB.md
 **/.mcp.json
