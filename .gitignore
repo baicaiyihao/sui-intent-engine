@@ -44,7 +44,6 @@ src/frontend/scripts/*.ts
 src/frontend/scripts/config.json
 
 # Sensitive documentation
-**/CLAUDE.md
 **/SUI_DEEPBOOK_KB.md
 **/.mcp.json
 
