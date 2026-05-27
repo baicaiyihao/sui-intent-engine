@@ -4,14 +4,15 @@
 
 ## 项目简介
 
-**SUI Intent Engine** 是一个基于自然语言的 DeFi 交易意图引擎，集成 SUI 原生订单簿 DeepBook V3，提供实时市场数据可视化和 AI 辅助交易功能。
+**SUI Intent Engine** 是一个基于自然语言的 DeFi 交易意图引擎，结合 AI 量化分析和 SUI 原生订单簿 DeepBook V3，提供智能交易体验。
 
 ## 核心功能
 
-1. **自然语言交易** - 用日常语言描述交易需求
-2. **实时市场数据** - K线图、订单簿、Ticker
-3. **DeepBook V3 交易** - SUI 原生订单簿执行
-4. **AI 策略分析** - 技术指标和信号分析
+1. **自然语言交易** - "RSI 低于 30 时买入 100 美金 SUI"
+2. **AI 量化分析** - RSI/MACD/KDJ/布林带多维度技术分析
+3. **实时市场数据** - K线图、订单簿、Ticker
+4. **DeepBook V3 交易** - SUI 原生订单簿执行
+5. **策略回测** - 自定义指标和回测验证
 
 ## 项目结构
 
@@ -20,7 +21,6 @@ sui-intent-engine/
 ├── docs/                       # 技术文档
 │   ├── deepbookv3/            # DeepBook V3 合约文档
 │   ├── deepbookv3-sdk/        # DeepBook SDK 文档
-│   ├── deepbook-margin/       # Margin 交易文档
 │   └── DEEPBOOK_TUTORIAL.md   # DeepBook 入门指南
 ├── src/
 │   ├── frontend/               # React 前端
@@ -29,10 +29,18 @@ sui-intent-engine/
 │   │       ├── OrderBook.tsx      # 订单簿
 │   │       ├── TradingPage.tsx    # 交易页面
 │   │       └── AIChatPage.tsx     # AI 对话
+│   ├── quant_core/            # AI 量化引擎
+│   │   ├── ai/                    # AI 分析模块
+│   │   │   ├── analyzer.py         # 市场分析器
+│   │   │   ├── trading_signal.py   # 交易信号
+│   │   │   └── indicator_quality.py # 指标质量分析
+│   │   ├── strategy/              # 策略模块
+│   │   │   ├── compiler.py         # 策略编译
+│   │   │   └── indicators.py      # 技术指标
+│   │   └── backtest/              # 回测引擎
 │   ├── sui/                   # SUI DeepBook 集成
-│   │   ├── deepbook_client.py    # DeepBook 客户端
-│   │   ├── deepbook_cache.py     # 市场数据缓存
-│   │   └── deepbook_indexer.py   # 数据索引
+│   │   ├── deepbook_client.py     # DeepBook 客户端
+│   │   └── deepbook_cache.py     # 市场数据缓存
 │   ├── server.py              # FastAPI 服务
 │   └── sui_intent_server.py   # SUI Intent API
 ```
@@ -44,9 +52,24 @@ sui-intent-engine/
 | 前端 | React / TypeScript / Vite |
 | 后端 | Python FastAPI |
 | AI | MiniMax LLM |
+| 量化分析 | 技术指标、信号生成、回测 |
 | 链交互 | SUI SDK |
 | 订单簿 | DeepBook V3 |
 | 市场数据 | DeepBook V3 Indexer |
+
+## AI 量化引擎 (QuantCore)
+
+**功能模块**：
+- `analyzer.py` - 市场技术分析（RSI/MACD/KDJ/布林带）
+- `trading_signal.py` - AI 交易信号生成
+- `indicator_quality.py` - 自定义指标质量分析
+- `backtest/` - 策略回测引擎
+
+**分析维度**：
+- 价格趋势识别
+- 超买超卖判断
+- 支撑阻力位
+- 成交量分析
 
 ## DeepBook V3 主网配置
 
