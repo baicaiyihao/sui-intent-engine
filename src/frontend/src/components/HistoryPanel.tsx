@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit'
+import { useI18n } from '../i18n/I18nProvider'
 
 interface HistoryItem {
   id: string
@@ -18,8 +19,9 @@ function HistoryPanel() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const account = useCurrentAccount()
   const suiClient = useSuiClient()
+  const { t } = useI18n()
 
-  // 从链上查询订单历史
+  // Query order history from chain
   const fetchOnChainHistory = async () => {
     if (!account) return
 
@@ -32,7 +34,7 @@ function HistoryPanel() {
 
       const ordersMap = new Map<string, HistoryItem>()
 
-      // 按时间顺序处理
+      // Process in chronological order
       const sortedTxs = [...(txs.data || [])].sort(
         (a, b) => Number(a.timestampMs || 0) - Number(b.timestampMs || 0)
       )
@@ -51,11 +53,11 @@ function HistoryPanel() {
           const orderId = String(parsed.order_id || '')
           if (!orderId || orderId === '0' || orderId === 'undefined') continue
 
-          // OrderPlaced 事件 - 创建订单
+          // OrderPlaced event - create order
           if (eventType.includes('OrderPlaced')) {
             if (!ordersMap.has(orderId)) {
               const poolId = parsed.pool_id || ''
-              // 从 poolId 判断交易对
+              // Determine trading pair from poolId
               let pair = 'SUI/USDC'
               if (poolId.includes('1c19362') || poolId.includes('e05dafb')) {
                 pair = 'SUI/USDC'
@@ -68,7 +70,7 @@ function HistoryPanel() {
                 price: Number(parsed.price) || 0,
                 quantity: Number(parsed.placed_quantity || parsed.original_quantity || 0) / 1e9 || 0,
                 filled: Number(parsed.executed_quantity || 0) / 1e9 || 0,
-                status: 'open' as const, // 默认挂单
+                status: 'open' as const, // Default: open order
                 timestamp: txTime,
                 txDigest: tx.digest,
                 poolId,
@@ -76,7 +78,7 @@ function HistoryPanel() {
             }
           }
 
-          // OrderInfo - 更新状态 (status: 0=open, 1=filled, 2=cancelled)
+          // OrderInfo - update status (status: 0=open, 1=filled, 2=cancelled)
           if (eventType.includes('OrderInfo') && parsed.status !== undefined) {
             const order = ordersMap.get(orderId)
             if (order) {
@@ -91,7 +93,7 @@ function HistoryPanel() {
             }
           }
 
-          // OrderCanceled 事件
+          // OrderCanceled event
           if (eventType.includes('OrderCanceled') || eventType.includes('OrderCancelled')) {
             const order = ordersMap.get(orderId)
             if (order) {
@@ -101,7 +103,7 @@ function HistoryPanel() {
         }
       }
 
-      // 显示所有订单（挂单中、已成交、已取消）
+      // Show all orders (open, filled, cancelled)
       const historyOrders = Array.from(ordersMap.values())
         .sort((a, b) => b.timestamp - a.timestamp)
 
@@ -113,19 +115,20 @@ function HistoryPanel() {
   }
 
   useEffect(() => {
-    // 组件挂载时自动查询
+    // Auto-query on component mount
     if (account) {
       fetchOnChainHistory()
     }
   }, [account])
 
-  const formatPrice = (price: number) => price >= 1e6 ? (price / 1e6).toFixed(4) : price.toFixed(4)
+  // USDC precision is 6 decimals
+  const formatPrice = (price: number) => (price / 1e6).toFixed(4)
   const formatTime = (ts: number) => {
     const d = new Date(ts)
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
   }
   const formatTotal = (price: number, filled: number) => {
-    const p = price >= 1e6 ? price / 1e6 : price
+    const p = price / 1e6
     return (p * filled).toFixed(4)
   }
 
@@ -133,20 +136,19 @@ function HistoryPanel() {
     <div className="orders-panel">
       {history.length === 0 ? (
         <div className="orders-empty">
-          <span>暂无订单历史</span>
-          <small>所有订单会显示在这里</small>
+          <span>{t('history.empty')}</span>
         </div>
       ) : (
         <table className="detail-table">
           <thead>
             <tr>
-              <th>时间</th>
-              <th>类型</th>
-              <th>价格 (USDC)</th>
-              <th>数量 (SUI)</th>
-              <th>已成交</th>
-              <th>总额 (USDC)</th>
-              <th>状态</th>
+              <th>{t('history.col.time')}</th>
+              <th>{t('history.col.type')}</th>
+              <th>{t('history.col.price')}</th>
+              <th>{t('history.col.amount')}</th>
+              <th>{t('history.col.filled')}</th>
+              <th>{t('history.col.total')}</th>
+              <th>{t('history.col.status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -155,7 +157,7 @@ function HistoryPanel() {
                 <td className="time-cell">{formatTime(item.timestamp)}</td>
                 <td>
                   <span className={`side-badge ${item.type}`}>
-                    {item.type === 'buy' ? '买入' : '卖出'}
+                    {item.type === 'buy' ? t('history.side.buy') : t('history.side.sell')}
                   </span>
                 </td>
                 <td>{formatPrice(item.price)}</td>
@@ -164,7 +166,7 @@ function HistoryPanel() {
                 <td>{formatTotal(item.price, item.filled)}</td>
                 <td>
                   <span className={`status-badge ${item.status}`}>
-                    {item.status === 'open' ? '挂单' : item.status === 'filled' ? '成交' : '取消'}
+                    {item.status === 'open' ? t('history.status.open') : item.status === 'filled' ? t('history.status.filled') : t('history.status.cancelled')}
                   </span>
                 </td>
               </tr>

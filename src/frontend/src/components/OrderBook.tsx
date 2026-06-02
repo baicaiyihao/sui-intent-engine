@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useCurrentAccount } from '@mysten/dapp-kit'
+import { useI18n } from '../i18n/I18nProvider'
 
 interface OrderBookEntry {
   price: number
@@ -8,14 +9,19 @@ interface OrderBookEntry {
   side: 'bid' | 'ask'
 }
 
+interface OrderBookProps {
+  onPriceClick?: (price: number) => void
+}
+
 // Backend API for cached DeepBook data
 const API_BASE = 'http://localhost:8001'
 
-function OrderBook() {
+function OrderBook({ onPriceClick }: OrderBookProps) {
   const [asks, setAsks] = useState<OrderBookEntry[]>([])
   const [bids, setBids] = useState<OrderBookEntry[]>([])
   const [loading, setLoading] = useState(true)
   const account = useCurrentAccount()
+  const { t } = useI18n()
 
   useEffect(() => {
     const fetchOrderBook = async () => {
@@ -93,7 +99,7 @@ function OrderBook() {
   if (!account) {
     return (
       <div className="orderbook-loading">
-        <span>请先连接钱包</span>
+        <span>{t('orderbook.connectWallet')}</span>
       </div>
     )
   }
@@ -101,7 +107,7 @@ function OrderBook() {
   if (loading) {
     return (
       <div className="orderbook-loading">
-        <span>加载中...</span>
+        <span>{t('orderbook.loading')}</span>
       </div>
     )
   }
@@ -110,7 +116,7 @@ function OrderBook() {
   if (asks.length === 0 && bids.length === 0) {
     return (
       <div className="orderbook-loading">
-        <span>暂无深度数据</span>
+        <span>{t('orderbook.empty')}</span>
       </div>
     )
   }
@@ -119,20 +125,20 @@ function OrderBook() {
     <div className="orderbook">
       {/* Header */}
       <div className="orderbook-header">
-        <span>价格 (USDC)</span>
-        <span>数量 (SUI)</span>
-        <span>总计</span>
+        <span>{t('orderbook.col.price')}</span>
+        <span>{t('orderbook.col.quantity')}</span>
+        <span>{t('orderbook.col.total')}</span>
       </div>
 
       {/* Asks (Sell orders) - displayed top to bottom, lowest price at bottom */}
       <div className="orderbook-asks">
         {[...asks].reverse().map((ask, i) => (
-          <div key={`ask-${i}`} className="orderbook-row ask">
+          <div key={`ask-${i}`} className="orderbook-row ask" onClick={() => onPriceClick?.(ask.price)}>
             <div
               className="orderbook-row-bg ask-bg"
               style={{ width: `${maxTotal > 0 ? (ask.total / maxTotal) * 100 : 0}%` }}
             />
-            <span className="price">{ask.price.toFixed(4)}</span>
+            <span className="price clickable">{ask.price.toFixed(4)}</span>
             <span className="quantity">{ask.quantity.toFixed(4)}</span>
             <span className="total">{ask.total.toFixed(4)}</span>
           </div>
@@ -141,7 +147,7 @@ function OrderBook() {
 
       {/* Spread */}
       <div className="orderbook-spread">
-        <span>价差</span>
+        <span>{t('orderbook.spread')}</span>
         <span>
           {asks.length > 0 && bids.length > 0
             ? (asks[0].price - bids[0].price).toFixed(4)
@@ -152,12 +158,12 @@ function OrderBook() {
       {/* Bids (Buy orders) - highest price at top */}
       <div className="orderbook-bids">
         {bids.map((bid, i) => (
-          <div key={`bid-${i}`} className="orderbook-row bid">
+          <div key={`bid-${i}`} className="orderbook-row bid" onClick={() => onPriceClick?.(bid.price)}>
             <div
               className="orderbook-row-bg bid-bg"
               style={{ width: `${maxTotal > 0 ? (bid.total / maxTotal) * 100 : 0}%` }}
             />
-            <span className="price">{bid.price.toFixed(4)}</span>
+            <span className="price clickable">{bid.price.toFixed(4)}</span>
             <span className="quantity">{bid.quantity.toFixed(4)}</span>
             <span className="total">{bid.total.toFixed(4)}</span>
           </div>

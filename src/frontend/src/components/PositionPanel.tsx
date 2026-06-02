@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useCurrentAccount, useSignTransaction, useSuiClient } from '@mysten/dapp-kit'
-import { Transaction } from '@mysten/sui/transactions'
+import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit'
+import { useI18n } from '../i18n/I18nProvider'
 
-const MAINNET_PKG = '0x337f4f4f6567fcd778d5454f27c16c70e2f274cc6377ea6249ddf491482ef497'
 const SUI_COIN = '0x2::sui::SUI'
+const USDC_COIN = '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC'
 
 interface Position {
   totalDeposited: number
@@ -30,46 +30,66 @@ function PositionPanel() {
     realizedPnL: 0,
     trades: []
   })
-  const [bmBalance, setBmBalance] = useState<number>(0)
-  const [walletBalance, setWalletBalance] = useState<number>(0)
-  const [withdrawing, setWithdrawing] = useState(false)
+  const [bmSuiBalance, setBmSuiBalance] = useState<number>(0)
+  const [bmUsdcBalance, setBmUsdcBalance] = useState<number>(0)
+  const [walletSuiBalance, setWalletSuiBalance] = useState<number>(0)
+  const [walletUsdcBalance, setWalletUsdcBalance] = useState<number>(0)
+  const [loading, setLoading] = useState(false)
   const account = useCurrentAccount()
-  const { mutate: signTransaction } = useSignTransaction()
   const suiClient = useSuiClient()
+  const { t } = useI18n()
 
   const bmId = localStorage.getItem('balanceManagerId') || ''
 
-  // 获取钱包 SUI 余额
-  const fetchWalletBalance = useCallback(async () => {
+  // Fetch wallet SUI and USDC balances
+  const fetchWalletBalances = useCallback(async () => {
     if (!account?.address) return
 
     try {
-      const balance = await suiClient.getBalance({
-        owner: account.address,
-        coinType: '0x2::sui::SUI'
-      })
-      setWalletBalance(Number(balance.totalBalance) / 1e9) // 转换为 SUI
+      const [suiBalance, usdcBalance] = await Promise.all([
+        suiClient.getBalance({
+          owner: account.address,
+          coinType: '0x2::sui::SUI'
+        }),
+        suiClient.getBalance({
+          owner: account.address,
+          coinType: USDC_COIN
+        })
+      ])
+      setWalletSuiBalance(Number(suiBalance.totalBalance) / 1e9)
+      setWalletUsdcBalance(Number(usdcBalance.totalBalance) / 1e6)
     } catch (e) {
-      console.error('Failed to fetch wallet balance:', e)
+      console.error('Failed to fetch wallet balances:', e)
     }
   }, [account?.address, suiClient])
 
-  // 获取 BalanceManager SUI 余额
-  const fetchBMBalance = useCallback(async () => {
+  // Fetch BalanceManager SUI and USDC balances
+  const fetchBMBalances = useCallback(async () => {
     if (!bmId) return
 
+    setLoading(true)
     try {
-      // 直接用 getBalance 查询 BM 的 SUI 余额
-      const balance = await suiClient.getBalance({
-        owner: bmId,
-        coinType: '0x2::sui::SUI'
-      })
-      const suiBalance = Number(balance.totalBalance) / 1e9
-      console.log('BM Balance fetched:', suiBalance, 'Raw:', balance.totalBalance)
-      setBmBalance(suiBalance)
+      const [suiBalance, usdcBalance] = await Promise.all([
+        suiClient.getBalance({
+          owner: bmId,
+          coinType: '0x2::sui::SUI'
+        }),
+        suiClient.getBalance({
+          owner: bmId,
+          coinType: USDC_COIN
+        })
+      ])
+      const suiBal = Number(suiBalance.totalBalance) / 1e9
+      const usdcBal = Number(usdcBalance.totalBalance) / 1e6
+      console.log('BM Balances fetched - SUI:', suiBal, 'USDC:', usdcBal)
+      setBmSuiBalance(suiBal)
+      setBmUsdcBalance(usdcBal)
     } catch (e) {
-      console.error('Failed to fetch BM balance:', e)
-      setBmBalance(0)
+      console.error('Failed to fetch BM balances:', e)
+      setBmSuiBalance(0)
+      setBmUsdcBalance(0)
+    } finally {
+      setLoading(false)
     }
   }, [bmId, suiClient])
 
@@ -99,136 +119,107 @@ function PositionPanel() {
       trades
     })
 
-    // 获取链上真实余额
-    fetchWalletBalance()
-    fetchBMBalance()
-  }, [fetchWalletBalance, fetchBMBalance])
+    // Fetch real on-chain balances
+    fetchWalletBalances()
+    fetchBMBalances()
+  }, [fetchWalletBalances, fetchBMBalances])
 
-  const handleWithdrawAll = useCallback(() => {
-    if (!account || !bmId) return
-
-    setWithdrawing(true)
-
-    const tx = new Transaction()
-    tx.setGasBudget(10000000)
-    tx.setSender(account.address)
-
-    const [withdrawn] = tx.moveCall({
-      target: `${MAINNET_PKG}::balance_manager::withdraw_all`,
-      arguments: [tx.object(bmId)],
-      typeArguments: [SUI_COIN],
-    })
-
-    tx.transferObjects([withdrawn], account.address)
-
-    signTransaction(
-      { transaction: tx as any, chain: 'sui:mainnet' } as any,
-      {
-        onSuccess: async (result: any) => {
-          try {
-            const execResult = await suiClient.executeTransactionBlock({
-              transactionBlock: result.bytes,
-              signature: result.signature,
-              options: { showEffects: true }
-            })
-            if (execResult.effects?.status?.status === 'success') {
-              const currentWithdrawn = parseFloat(localStorage.getItem('totalWithdrawn') || '0')
-              const currentBalance = position.currentBalance
-              localStorage.setItem('totalWithdrawn', (currentWithdrawn + currentBalance).toString())
-              setPosition(prev => ({
-                ...prev,
-                totalWithdrawn: currentWithdrawn + currentBalance,
-                currentBalance: 0
-              }))
-              alert('提取成功！')
-            }
-          } catch (e) {
-            alert('提取失败')
-          } finally {
-            setWithdrawing(false)
-          }
-        },
-        onError: () => {
-          setWithdrawing(false)
-        }
-      }
-    )
-  }, [account, bmId, position.currentBalance, signTransaction, suiClient])
+  const handleRefresh = useCallback(() => {
+    fetchWalletBalances()
+    fetchBMBalances()
+  }, [fetchWalletBalances, fetchBMBalances])
 
   return (
     <div className="card">
-      <h2>持仓 & P&L</h2>
+      <div className="card-header">
+        <h2>{t('position.title')}</h2>
+        <button
+          className="btn btn-small"
+          onClick={handleRefresh}
+          disabled={loading}
+        >
+          {loading ? t('position.refreshing') : t('position.refresh')}
+        </button>
+      </div>
 
-      <div className="position-summary">
-        <div className="position-item">
-          <label>钱包余额 (链上):</label>
-          <span className="value">{walletBalance.toFixed(4)} SUI</span>
-          <button className="btn btn-small" onClick={fetchWalletBalance}>刷新</button>
+      <div className="balance-section">
+        <h3>{t('position.walletBalances')}</h3>
+        <div className="balance-grid">
+          <div className="balance-item">
+            <label>SUI</label>
+            <span className="balance-value">{walletSuiBalance.toFixed(4)}</span>
+          </div>
+          <div className="balance-item">
+            <label>USDC</label>
+            <span className="balance-value">{walletUsdcBalance.toFixed(4)}</span>
+          </div>
         </div>
-        <div className="position-item">
-          <label>BalanceManager:</label>
-          <span className="value">{bmId ? `${bmId.slice(0, 10)}...` : '未设置'}</span>
+      </div>
+
+      <div className="balance-section">
+        <h3>{t('position.bm')}</h3>
+        <div className="bm-info">
+          <span className="bm-id">{bmId ? bmId.slice(0, 10) + '...' : t('position.bmNotSet')}</span>
         </div>
-        <div className="position-item">
-          <label>BM 余额 (链上):</label>
-          <span className="value">{bmBalance.toFixed(4)} SUI</span>
-          <button className="btn btn-small" onClick={fetchBMBalance}>刷新</button>
+        <div className="balance-grid">
+          <div className="balance-item">
+            <label>SUI</label>
+            <span className="balance-value highlight">{bmSuiBalance.toFixed(4)}</span>
+          </div>
+          <div className="balance-item">
+            <label>USDC</label>
+            <span className="balance-value highlight">{bmUsdcBalance.toFixed(4)}</span>
+          </div>
         </div>
       </div>
 
       <div className="position-stats">
         <div className="stat-card">
-          <div className="stat-label">总充值</div>
+          <div className="stat-label">{t('position.totalDeposited')}</div>
           <div className="stat-value">{position.totalDeposited.toFixed(4)} SUI</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">已提取</div>
+          <div className="stat-label">{t('position.totalWithdrawn')}</div>
           <div className="stat-value">{position.totalWithdrawn.toFixed(4)} SUI</div>
         </div>
         <div className="stat-card highlight">
-          <div className="stat-label">当前余额</div>
+          <div className="stat-label">{t('position.currentBalance')}</div>
           <div className="stat-value">{position.currentBalance.toFixed(4)} SUI</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">挂单中</div>
+          <div className="stat-label">{t('position.openOrdersValue')}</div>
           <div className="stat-value">{position.openOrdersValue.toFixed(4)} SUI</div>
         </div>
       </div>
 
       <div className="pnl-section">
-        <h3>交易统计</h3>
+        <h3>{t('position.tradeStats')}</h3>
         <div className="pnl-stats">
           <div className="pnl-item">
-            <label>成交次数:</label>
-            <span>{position.trades.length} 次</span>
+            <label>{t('position.tradeCount')}</label>
+            <span>{position.trades.length}{t('position.tradeCountUnit')}</span>
           </div>
           <div className="pnl-item">
-            <label>买入:</label>
-            <span>{position.trades.filter(t => t.type === 'buy').length} 次</span>
+            <label>{t('position.buyCount')}</label>
+            <span>{position.trades.filter(t => t.type === 'buy').length}{t('position.tradeCountUnit')}</span>
           </div>
           <div className="pnl-item">
-            <label>卖出:</label>
-            <span>{position.trades.filter(t => t.type === 'sell').length} 次</span>
+            <label>{t('position.sellCount')}</label>
+            <span>{position.trades.filter(t => t.type === 'sell').length}{t('position.tradeCountUnit')}</span>
           </div>
         </div>
 
         <div className="realized-pnl">
-          <label>实现盈亏:</label>
+          <label>{t('position.realizedPnL')}</label>
           <span className={position.realizedPnL >= 0 ? 'profit' : 'loss'}>
             {position.realizedPnL >= 0 ? '+' : ''}{position.realizedPnL.toFixed(4)} USDC
           </span>
         </div>
       </div>
 
-      {position.currentBalance > 0 && (
-        <button
-          className="btn btn-primary"
-          onClick={handleWithdrawAll}
-          disabled={withdrawing || !account || !bmId}
-        >
-          {withdrawing ? '提取中...' : '全部提取到钱包'}
-        </button>
-      )}
+      <div className="hint-text">
+        <small>{t('position.withdrawHint')}</small>
+      </div>
     </div>
   )
 }

@@ -688,7 +688,7 @@
   text-align: center;
 }
 
-/* Action recommendation bar — 明确的可执行操作指令 */
+/* Action recommendation bar — explicit executable action instruction */
 .rec-action-bar {
   display: flex;
   align-items: center;

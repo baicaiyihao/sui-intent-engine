@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useCurrentAccount, useSignTransaction, useSuiClient } from '@mysten/dapp-kit'
 import { Transaction } from '@mysten/sui/transactions'
+import { useI18n, TranslationKey } from '../i18n/I18nProvider'
+import './AIChatPage.css'
 
 // Constants
 const UTILS_PKG = '0x600138d3179e2fc746f6774f360a6e1fa68e90d66d082af66399adabe46f22a4'
@@ -11,10 +13,20 @@ const USDC_COIN = '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f
 const SUI_COIN = '0x2::sui::SUI'
 const DEEP_COIN = '0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP'
 
+// Backend endpoints
+const QUANT_API = 'http://localhost:8000'
+const DEEPBOOK_API = 'http://localhost:8001'
+
 interface Message {
+  id?: string
   role: 'user' | 'ai'
   content: string
   timestamp: number
+  loading?: boolean
+  error?: string
+  questionType?: string
+  questionLabel?: string
+  recommendedPrice?: number  // LLM recommended price (used for the order button in limit_price type)
 }
 
 interface OrderProposal {
@@ -24,6 +36,53 @@ interface OrderProposal {
   reason: string
   totalCost?: number
   estimatedReceive?: number
+  // Editable order form context
+  availableBalance?: number     // Available balance (BUY=USDC, SELL=SUI)
+  balanceCurrency?: 'SUI' | 'USDC'
+  maxQuantity?: number          // Maximum buyable/sellable quantity calculated from balance
+}
+
+interface QuickQuestion {
+  type: string
+  labelKey: TranslationKey
+  icon: string
+}
+
+const QUICK_QUESTIONS: QuickQuestion[] = [
+  { type: 'limit_price', labelKey: 'aiChat.qq.limitPrice', icon: '🎯' },
+  { type: 'maker_vs_taker', labelKey: 'aiChat.qq.makerVsTaker', icon: '⚖️' },
+  { type: 'bm_allocation', labelKey: 'aiChat.qq.bmAllocation', icon: '💼' },
+  { type: 'expired_order', labelKey: 'aiChat.qq.expiredOrder', icon: '⏰' },
+  { type: 'depth_check', labelKey: 'aiChat.qq.depthCheck', icon: '🌊' },
+  { type: 'liquidity_trend', labelKey: 'aiChat.qq.liquidityTrend', icon: '📈' },
+  { type: 'reasoning', labelKey: 'aiChat.qq.reasoning', icon: '🤔' },
+  { type: 'multi_timeframe', labelKey: 'aiChat.qq.multiTimeframe', icon: '🔄' },
+]
+
+/**
+ * Extract recommended price from LLM response
+ * - Match $X.XXXX pattern
+ * - Filter candidates within 3% of currentPrice (excludes stop-loss/take-profit and other distant prices)
+ * - Return the median (more robust, handles multiple batched limit orders)
+ */
+function extractRecommendedPrice(answer: string, currentPrice: number | null): number | undefined {
+  if (!currentPrice) return undefined
+  const priceRegex = /\$?(\d+\.\d{2,6})/g
+  const priceMatches: RegExpExecArray[] = []
+  let pm: RegExpExecArray | null
+  while ((pm = priceRegex.exec(answer)) !== null) {
+    priceMatches.push(pm)
+  }
+  const candidates: number[] = []
+  for (const m of priceMatches) {
+    const p = parseFloat(m[1])
+    if (p > 0 && Math.abs(p - currentPrice) / currentPrice < 0.03) {
+      candidates.push(p)
+    }
+  }
+  if (candidates.length === 0) return undefined
+  candidates.sort((a, b) => a - b)
+  return candidates[Math.floor(candidates.length / 2)]
 }
 
 function AIChatPage() {
@@ -33,9 +92,193 @@ function AIChatPage() {
   const [proposal, setProposal] = useState<OrderProposal | null>(null)
   const [executing, setExecuting] = useState(false)
   const [txResult, setTxResult] = useState<string | null>(null)
+  const [askingType, setAskingType] = useState<string | null>(null)
+  // Wallet balance cache (used directly when clicking "Buy at recommended price", no waiting)
+  const [walletBalances, setWalletBalances] = useState<{ usdc: number; sui: number; ts: number } | null>(null)
+  const balanceRef = useRef(walletBalances)
+  balanceRef.current = walletBalances
   const account = useCurrentAccount()
   const { mutate: signTransaction } = useSignTransaction()
   const suiClient = useSuiClient()
+  const { t, locale } = useI18n()
+
+  // Fetch and cache wallet balance (USDC + SUI)
+  const refreshWalletBalance = useCallback(async (silent = true) => {
+    const addr = account?.address
+    if (!addr) {
+      setWalletBalances(null)
+      return
+    }
+    try {
+      const [usdcData, suiData] = await Promise.all([
+        suiClient.getBalance({ owner: addr, coinType: USDC_COIN }),
+        suiClient.getBalance({ owner: addr, coinType: SUI_COIN }),
+      ])
+      setWalletBalances({
+        usdc: Number(usdcData.totalBalance) / 1e6,
+        sui: Number(suiData.totalBalance) / 1e9,
+        ts: Date.now(),
+      })
+    } catch (e) {
+      if (!silent) console.error('Balance fetch error:', e)
+    }
+  }, [account?.address, suiClient])
+
+  // Wallet switch / first mount: pull once immediately
+  useEffect(() => {
+    refreshWalletBalance(false)
+  }, [refreshWalletBalance])
+
+  // Silent refresh every 30 seconds (keep data fresh)
+  useEffect(() => {
+    if (!account?.address) return
+    const timer = setInterval(() => refreshWalletBalance(true), 30000)
+    return () => clearInterval(timer)
+  }, [account?.address, refreshWalletBalance])
+
+  // Collect real-time data for question context
+  const fetchContextData = useCallback(async () => {
+    const ctx: Record<string, any> = {}
+
+    try {
+      // 1) Market ticker
+      const tickerResp = await fetch(`${DEEPBOOK_API}/api/v1/cache/ticker`)
+      const tickerData = await tickerResp.json()
+      if (tickerData.success && tickerData.data) {
+        const tk = tickerData.data
+        ctx.last_price = tk.last_price
+        ctx.best_bid = (tk.last_price * 0.9995).toFixed(4)
+        ctx.best_ask = (tk.last_price * 1.0005).toFixed(4)
+        ctx.spread_bps = t('aiChat.ctx.spread')
+        ctx.high_24h = tk.high
+        ctx.low_24h = tk.low
+        ctx.volume_24h = tk.volume
+        ctx.change_24h = tk.price_change_percent
+        ctx.bid_depth = `${t('aiChat.ctx.depthPrefix')}${Math.round(tk.volume * 0.005)}${t('aiChat.ctx.depthSuffix')}`
+        ctx.ask_depth = `${t('aiChat.ctx.depthPrefix')}${Math.round(tk.volume * 0.005)}${t('aiChat.ctx.depthSuffix')}`
+        ctx.ask_levels = t('aiChat.ctx.askLevels')
+      }
+    } catch (e) {
+      console.error('Ticker fetch error:', e)
+    }
+
+    try {
+      // 2) Technical indicators
+      const analysisResp = await fetch(`${QUANT_API}/api/v1/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: 'SUI/USDT', timeframe: '1h', days: 7, language: locale === 'zh' ? 'zh-CN' : 'en' })
+      })
+      const analysisData = await analysisResp.json()
+      if (analysisData.success && analysisData.data) {
+        const ind = analysisData.data.indicators || {}
+        ctx.rsi = ind.rsi?.toFixed(1)
+        ctx.macd = ind.macd?.toFixed(4)
+        ctx.macd_hist = ind.macd_hist?.toFixed(4)
+        ctx.boll_upper = ind.boll_upper?.toFixed(4)
+        ctx.boll_lower = ind.boll_lower?.toFixed(4)
+        ctx.atr = ind.atr?.toFixed(4)
+        ctx.trend = analysisData.data.trend
+        ctx.support = analysisData.data.support?.toFixed(4)
+        ctx.resistance = analysisData.data.resistance?.toFixed(4)
+        ctx.rsi_analysis = analysisData.data.rsi_analysis
+        ctx.macd_analysis = analysisData.data.macd_analysis
+      }
+    } catch (e) {
+      console.error('Analysis fetch error:', e)
+    }
+
+    // 3) Wallet balance
+    if (account?.address) {
+      try {
+        const [sui, usdc] = await Promise.all([
+          suiClient.getBalance({ owner: account.address, coinType: SUI_COIN }),
+          suiClient.getBalance({ owner: account.address, coinType: USDC_COIN })
+        ])
+        ctx.wallet_sui = (Number(sui.totalBalance) / 1e9).toFixed(4)
+        ctx.wallet_usdc = (Number(usdc.totalBalance) / 1e6).toFixed(2)
+      } catch (e) {
+        console.error('Balance fetch error:', e)
+      }
+    }
+
+    return ctx
+  }, [account?.address, suiClient, t])
+
+  // Click preset question
+  const askQuestion = useCallback(async (q: QuickQuestion) => {
+    if (askingType) return
+
+    setAskingType(q.type)
+    const userMsgId = `user-${Date.now()}`
+    const aiMsgId = `ai-${Date.now()}`
+
+    // User message
+    const userMsg: Message = {
+      id: userMsgId,
+      role: 'user',
+      content: `${q.icon} ${t(q.labelKey)}`,
+      timestamp: Date.now(),
+      questionType: q.type,
+      questionLabel: t(q.labelKey),
+    }
+    // AI loading placeholder
+    const aiMsg: Message = {
+      id: aiMsgId,
+      role: 'ai',
+      content: '',
+      timestamp: Date.now(),
+      loading: true,
+      questionType: q.type,
+    }
+    setMessages(prev => [...prev, userMsg, aiMsg])
+
+    try {
+      // Auto-fetch data (user doesn't need to analyze manually)
+      const ctx = await fetchContextData()
+      ctx.question_type = q.type
+
+      const resp = await fetch(`${QUANT_API}/api/v1/ai/quick-question`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question_type: q.type,
+          symbol: 'SUI/USDT',
+          language: locale === 'zh' ? 'zh-CN' : 'en',
+          context: ctx,
+        }),
+      })
+      const data = await resp.json()
+
+      if (data.success) {
+        // Limit price question: auto-extract recommended price from LLM response for the "Order at this price" button
+        let recommendedPrice: number | undefined
+        if (q.type === 'limit_price') {
+          recommendedPrice = extractRecommendedPrice(data.answer, ctx.last_price)
+        }
+
+        setMessages(prev => prev.map(m =>
+          m.id === aiMsgId
+            ? { ...m, content: data.answer, loading: false, recommendedPrice }
+            : m
+        ))
+      } else {
+        setMessages(prev => prev.map(m =>
+          m.id === aiMsgId
+            ? { ...m, content: '', loading: false, error: data.detail || t('aiChat.error.unknown') }
+            : m
+        ))
+      }
+    } catch (e) {
+      setMessages(prev => prev.map(m =>
+        m.id === aiMsgId
+          ? { ...m, content: '', loading: false, error: (e as Error).message }
+          : m
+      ))
+    } finally {
+      setAskingType(null)
+    }
+  }, [askingType, fetchContextData, locale, t])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !account) return
@@ -53,12 +296,12 @@ function AIChatPage() {
     setTxResult(null)
 
     try {
-      // 获取当前市场价格
+      // Fetch current market price
       const priceResponse = await fetch('/market/price/SUI')
       const priceData = await priceResponse.json()
       const currentPrice = priceData.success ? priceData.price : 1.27
 
-      // 获取钱包 SUI 余额
+      // Fetch wallet SUI balance
       let walletBalance = 0
       try {
         const balanceData = await suiClient.getBalance({
@@ -70,7 +313,7 @@ function AIChatPage() {
         console.error('Failed to fetch wallet balance:', e)
       }
 
-      // 调用后端 API 解析意图
+      // Call backend API to parse intent
       const response = await fetch('/intent/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -83,29 +326,90 @@ function AIChatPage() {
       const data = await response.json()
 
       if (!data.success) {
-        throw new Error(data.error || '获取策略失败')
+        throw new Error(data.error || t('aiChat.error.getStrategy'))
       }
 
-      // 从用户输入中提取目标价格
+      // Extract target price from user input
       const priceMatch = input.match(/(\d+\.?\d*)\s*[Uu]/)
-      const targetPrice = priceMatch ? parseFloat(priceMatch[1]) : currentPrice * 0.95
+      let targetPrice: number | null = priceMatch ? parseFloat(priceMatch[1]) : null
 
-      // 从用户输入中解析数量（优先使用用户明确说的数量）
-      // 用户说"1个SUI" -> quantity = 1
+      // Parse quantity from user input (prefer user-stated quantity)
+      // User says "1个SUI" or "1 SUI" -> quantity = 1
       const quantityMatch = input.match(/(\d+\.?\d*)\s*[个]?[Ss][Uu][Ii]/i)
       let quantity = 1
       if (quantityMatch) {
         quantity = parseFloat(quantityMatch[1])
       }
 
-      // 判断买入还是卖出
-      const isBuy = input.includes('买') || input.includes('买入') || (!input.includes('卖') && !input.includes('出售'))
+      // Determine buy or sell (supports both Chinese and English; defaults to buy)
+      const hasBuyKw = /买|买入|做多|\bbuy\b|\blong\b|\bbull\b/i.test(input)
+      const hasSellKw = /卖|卖出|做空|\bsell\b|\bshort\b|\bbear\b/i.test(input)
+      const isBuy = hasBuyKw || !hasSellKw
 
-      // 卖出时检查钱包 SUI 余额是否足够
+      // Detect whether the user is asking for a price recommendation (supports both Chinese and English keywords)
+      const isAskingForRecommendation = !targetPrice && /推荐|建议|什么价|怎么挂|多少钱|帮我挂|挂个|挂一|recommend|suggest|best price|what price|how (to|should)|what's the best|good price|optimal price/i.test(input)
+
+      // When the user has not specified a price, let LLM recommend based on market analysis
+      let llmReasoning = ''
+      if (isAskingForRecommendation) {
+        try {
+          const ctx = await fetchContextData()
+          const llmResp = await fetch(`${QUANT_API}/api/v1/ai/quick-question`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              question_type: 'limit_price',
+              symbol: 'SUI/USDT',
+              language: locale === 'zh' ? 'zh-CN' : 'en',
+              context: {
+                ...ctx,
+                decision: isBuy ? 'BUY' : 'SELL',
+                entry_price: currentPrice,
+                stop_loss: currentPrice * 0.97,
+                take_profit: currentPrice * 1.05,
+                best_bid: (currentPrice * 0.9995).toFixed(4),
+                best_ask: (currentPrice * 1.0005).toFixed(4),
+              }
+            })
+          })
+          const llmData = await llmResp.json()
+          if (llmData.success && llmData.answer) {
+            llmReasoning = llmData.answer
+            // Extract price from LLM response (match $X.XXXX pattern, pick closest to current price with < 3% deviation)
+            const priceRegex = /\$?(\d+\.\d{2,6})/g
+            const priceMatches: RegExpExecArray[] = []
+            let pm: RegExpExecArray | null
+            while ((pm = priceRegex.exec(llmData.answer)) !== null) {
+              priceMatches.push(pm)
+            }
+            const candidates: number[] = []
+            for (const m of priceMatches) {
+              const p = parseFloat(m[1])
+              if (p > 0 && Math.abs(p - currentPrice) / currentPrice < 0.03) {
+                candidates.push(p)
+              }
+            }
+            if (candidates.length > 0) {
+              // Take the median (more robust)
+              candidates.sort((a, b) => a - b)
+              targetPrice = candidates[Math.floor(candidates.length / 2)]
+            }
+          }
+        } catch (e) {
+          console.error('LLM price recommendation failed:', e)
+        }
+      }
+
+      // Final fallback: if LLM didn't give a price either, use market price ±0.5% (much more reasonable than the previous -5%)
+      if (targetPrice == null) {
+        targetPrice = isBuy ? currentPrice * 0.995 : currentPrice * 1.005
+      }
+
+      // When selling, check if wallet SUI balance is sufficient
       if (!isBuy && walletBalance < quantity) {
         const errorMsg: Message = {
           role: 'ai',
-          content: `余额不足！你钱包只有 ${walletBalance.toFixed(4)} SUI，无法卖出 ${quantity} SUI。`,
+          content: t('aiChat.insufficientSui', { available: walletBalance.toFixed(4), requested: quantity }),
           timestamp: Date.now()
         }
         setMessages(prev => [...prev, errorMsg])
@@ -113,33 +417,33 @@ function AIChatPage() {
         return
       }
 
-      // 生成订单提案
+      // Generate order proposal
       const orderProposal: OrderProposal = {
         action: isBuy ? 'buy' : 'sell',
         price: targetPrice,
         quantity: typeof quantity === 'number' ? quantity : parseFloat(quantity) || 1,
         reason: isBuy
-          ? `当前 SUI 价格 ${currentPrice.toFixed(4)} USDT，你想以 ${targetPrice.toFixed(4)} USDT 买入`
-          : `当前 SUI 价格 ${currentPrice.toFixed(4)} USDT，你想以 ${targetPrice.toFixed(4)} USDT 卖出 (钱包余额: ${walletBalance.toFixed(4)} SUI)`,
+          ? t('aiChat.reason.buy', { current: currentPrice.toFixed(4), target: targetPrice.toFixed(4) })
+          : t('aiChat.reason.sell', { current: currentPrice.toFixed(4), target: targetPrice.toFixed(4), balance: walletBalance.toFixed(4) }),
         totalCost: isBuy ? targetPrice * quantity : undefined,
         estimatedReceive: isBuy ? undefined : targetPrice * quantity
       }
 
       setProposal(orderProposal)
 
-      let aiContent = `${orderProposal.reason}\n\n`
-      aiContent += `📋 **订单确认**\n`
-      aiContent += `- 操作: ${isBuy ? '买入' : '卖出'} SUI\n`
-      aiContent += `- 价格: ${targetPrice.toFixed(4)} USDC\n`
-      aiContent += `- 数量: ${orderProposal.quantity} SUI\n`
-      aiContent += `- 钱包余额: ${walletBalance.toFixed(4)} SUI\n`
-      if (orderProposal.totalCost) {
-        aiContent += `- 预计花费: ${orderProposal.totalCost.toFixed(4)} USDC\n`
-      }
-      if (orderProposal.estimatedReceive) {
-        aiContent += `- 预计获得: ${orderProposal.estimatedReceive.toFixed(4)} USDC\n`
-      }
-      aiContent += `\n是否执行此操作？`
+      let aiContent = t('aiChat.aiResponse', {
+        basis: isAskingForRecommendation ? t('aiChat.basis.marketAndLlm') : t('aiChat.basis.userInput'),
+        action: isBuy ? t('aiChat.action.buy') : t('aiChat.action.sell'),
+        currentPrice: currentPrice.toFixed(4),
+        suggestedPrice: targetPrice.toFixed(4),
+        deviationPct: (((targetPrice - currentPrice) / currentPrice) * 100).toFixed(2),
+        belowOrAbove: targetPrice < currentPrice ? t('aiChat.below') : t('aiChat.above'),
+        quantity: String(orderProposal.quantity),
+        walletBalance: walletBalance.toFixed(4),
+        totalCostLine: orderProposal.totalCost ? t('aiChat.line.totalCost', { amount: orderProposal.totalCost.toFixed(4) }) : '',
+        estimatedReceiveLine: orderProposal.estimatedReceive ? t('aiChat.line.estimatedReceive', { amount: orderProposal.estimatedReceive.toFixed(4) }) : '',
+        llmReasoningBlock: llmReasoning ? t('aiChat.line.llmReasoning', { reasoning: llmReasoning }) : '',
+      })
 
       const aiMessage: Message = {
         role: 'ai',
@@ -151,14 +455,14 @@ function AIChatPage() {
     } catch (error) {
       const errorMessage: Message = {
         role: 'ai',
-        content: `抱歉，处理你的请求时出现错误：${(error as Error).message}`,
+        content: t('aiChat.error.generic', { message: (error as Error).message }),
         timestamp: Date.now()
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
       setLoading(false)
     }
-  }, [input, account])
+  }, [input, account, fetchContextData, locale, t])
 
   const handleExecute = useCallback(() => {
     if (!proposal || !account) return
@@ -187,7 +491,7 @@ function AIChatPage() {
     })
 
     if (isNewBM) {
-      // 没有 BM 时，使用 create_deposit_then_place_limit_order 创建并下单
+      // When no BM exists, use create_deposit_then_place_limit_order to create and place order
       tx.moveCall({
         target: `${UTILS_PKG}::deepbookv3_utils::create_deposit_then_place_limit_order`,
         arguments: [
@@ -209,7 +513,7 @@ function AIChatPage() {
         typeArguments: [SUI_COIN, USDC_COIN],
       })
     } else {
-      // 有 BM 时，使用 deposit_then_place_limit_order_by_owner
+      // When BM exists, use deposit_then_place_limit_order_by_owner
       tx.moveCall({
         target: `${UTILS_PKG}::deepbookv3_utils::deposit_then_place_limit_order_by_owner`,
         arguments: [
@@ -244,10 +548,10 @@ function AIChatPage() {
               options: { showEffects: true, showEvents: true }
             })
             if (execResult.effects?.status?.status === 'success') {
-              // 如果是新创建的 BM，从事件中提取 ID 并保存
+              // If a new BM was created, extract ID from event and save
               if (isNewBM && execResult.events) {
                 for (const event of execResult.events) {
-                  // BalanceManager 创建事件
+                  // BalanceManager creation event
                   if (event.type?.includes('BalanceManagerEvent') || event.type?.includes('NewBalanceManager')) {
                     const parsed = event.parsedJson as any
                     const bmId = parsed?.balance_manager_id || parsed?.object_id
@@ -258,53 +562,161 @@ function AIChatPage() {
                   }
                 }
               }
-              setTxResult(`✅ 订单已提交！交易哈希: ${execResult.digest}`)
+              setTxResult(t('aiChat.orderOk', { digest: execResult.digest }))
               setProposal(null)
             } else {
-              setTxResult(`❌ 订单失败`)
+              setTxResult(t('aiChat.orderFailed'))
             }
           } catch (e) {
-            setTxResult(`❌ 执行失败: ${(e as Error).message}`)
+            setTxResult(t('aiChat.execFailed', { message: (e as Error).message }))
           } finally {
             setExecuting(false)
           }
         },
         onError: () => {
-          setTxResult(`❌ 签名被拒绝`)
+          setTxResult(t('aiChat.signRejected'))
           setExecuting(false)
         }
       }
     )
-  }, [proposal, account, signTransaction, suiClient])
+  }, [proposal, account, signTransaction, suiClient, t])
 
   const handleReject = useCallback(() => {
     setProposal(null)
     setTxResult(null)
     setMessages(prev => [...prev, {
       role: 'ai',
-      content: '好的，你可以继续描述你的交易需求。',
+      content: t('aiChat.continuePrompt'),
       timestamp: Date.now()
     }])
-  }, [])
+  }, [t])
+
+  // Generate order proposal directly from LLM recommended price
+  const handleCreateOrderFromRecommendation = useCallback(async (price: number) => {
+    if (!account) return
+    try {
+      // Prefer cached balance (zero-delay form popup)
+      // If cache doesn't exist (rare: just mounted, not fetched yet), silently fetch once
+      let usdcBalance = balanceRef.current?.usdc ?? 0
+      let suiBalance = balanceRef.current?.sui ?? 0
+      if (!balanceRef.current) {
+        const [usdcData, suiData] = await Promise.all([
+          suiClient.getBalance({ owner: account.address, coinType: USDC_COIN }),
+          suiClient.getBalance({ owner: account.address, coinType: SUI_COIN }),
+        ])
+        usdcBalance = Number(usdcData.totalBalance) / 1e6
+        suiBalance = Number(suiData.totalBalance) / 1e9
+        setWalletBalances({ usdc: usdcBalance, sui: suiBalance, ts: Date.now() })
+      }
+
+      // Fetch latest market price (not in cache range, prices change fast)
+      let currentPrice = price
+      try {
+        const priceResp = await fetch('/market/price/SUI')
+        const priceData = await priceResp.json()
+        if (priceData.success && priceData.price) currentPrice = priceData.price
+      } catch (e) {
+        console.error('Price fetch error:', e)
+      }
+
+      // BUY: use USDC to buy SUI
+      // Max buyable = USDC balance * 0.98 / price (reserve 2% for fees + gas)
+      const maxBuyQuantity = price > 0 ? (usdcBalance * 0.98) / price : 0
+
+      const ageStr = balanceRef.current
+        ? t('aiChat.ageSuffix', { seconds: Math.round((Date.now() - balanceRef.current.ts) / 1000) })
+        : ''
+
+      const orderProposal: OrderProposal = {
+        action: 'buy',
+        price,
+        quantity: 1,  // Default 1 SUI
+        reason: t('aiChat.reasonFromLlm', {
+          price: price.toFixed(4),
+          current: currentPrice.toFixed(4),
+          deviation: (((price - currentPrice) / currentPrice) * 100).toFixed(2),
+          usdc: usdcBalance.toFixed(2),
+          sui: suiBalance.toFixed(4),
+          age: ageStr,
+        }),
+        totalCost: price,
+        availableBalance: usdcBalance,
+        balanceCurrency: 'USDC',
+        maxQuantity: maxBuyQuantity,
+      }
+      setProposal(orderProposal)
+      setTxResult(null)
+    } catch (e) {
+      console.error('Create order from recommendation error:', e)
+    }
+  }, [account, suiClient, t])
 
   return (
     <div className="ai-chat-page">
+      {/* ========== Quick questions panel (persistent) ========== */}
+      <div className="quick-questions-panel">
+        <div className="qq-header">
+          <div className="qq-title">{t('aiChat.qqTitle')}</div>
+          <div className="qq-subtitle">{t('aiChat.qqSub')}</div>
+        </div>
+        <div className="qq-chips-grid">
+          {QUICK_QUESTIONS.map(q => (
+            <button
+              key={q.type}
+              className={`qq-chip ${askingType === q.type ? 'loading' : ''}`}
+              onClick={() => askQuestion(q)}
+              disabled={!!askingType || !account}
+              title={!account ? t('aiChat.connectWallet') : ''}
+            >
+              <span className="qq-icon">{askingType === q.type ? '⏳' : q.icon}</span>
+              <span className="qq-label">{t(q.labelKey)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ========== Chat area ========== */}
       <div className="chat-container">
         <div className="chat-messages">
           {messages.length === 0 && (
             <div className="chat-empty">
-              <p>👋 你好！告诉我你想如何交易</p>
-              <p>例如："SUI价格低于1.5U时买入1个SUI"</p>
+              <p>{t('aiChat.greeting')}</p>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('aiChat.greeting.example')}</p>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem' }}>{t('aiChat.greeting.hint')}</p>
             </div>
           )}
           {messages.map((msg, i) => (
-            <div key={i} className={`message ${msg.role}`}>
-              <div className="message-content">{msg.content}</div>
+            <div key={msg.id || i} className={`message ${msg.role} ${msg.questionType ? 'qa-message' : ''}`}>
+              <div className="message-content">
+                {msg.loading ? (
+                  <div className="qa-loading">
+                    <span className="qa-spinner">⏳</span>
+                    <span>{t('aiChat.loading')}</span>
+                  </div>
+                ) : msg.error ? (
+                  <div className="qa-error">⚠ {msg.error}</div>
+                ) : (
+                  <div className="qa-text">{msg.content}</div>
+                )}
+              </div>
+              {/* limit_price type: show "Order at recommended price" button after LLM returns */}
+              {!msg.loading && !msg.error && msg.recommendedPrice && msg.questionType === 'limit_price' && (
+                <div className="qa-action-row">
+                  <button
+                    className="qa-action-btn buy"
+                    onClick={() => handleCreateOrderFromRecommendation(msg.recommendedPrice!)}
+                    disabled={!account || executing}
+                    title={!account ? t('aiChat.connectWallet') : ''}
+                  >
+                    {t('aiChat.buyAt', { price: msg.recommendedPrice.toFixed(4) })}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {loading && (
             <div className="message ai">
-              <div className="message-content">思考中...</div>
+              <div className="message-content">{t('aiChat.thinking')}</div>
             </div>
           )}
           {txResult && (
@@ -316,28 +728,125 @@ function AIChatPage() {
 
         {proposal && !txResult && (
           <div className="proposal-panel">
-            <h3>📋 订单确认</h3>
-            <div className="proposal-details">
-              <p><strong>操作:</strong> {proposal.action === 'buy' ? '买入' : '卖出'}</p>
-              <p><strong>价格:</strong> {proposal.price.toFixed(4)} USDC</p>
-              <p><strong>数量:</strong> {proposal.quantity} SUI</p>
-              {proposal.totalCost && <p><strong>预计花费:</strong> {proposal.totalCost.toFixed(4)} USDC</p>}
-              {proposal.estimatedReceive && <p><strong>预计获得:</strong> {proposal.estimatedReceive.toFixed(4)} USDC</p>}
+            <h3>{t('aiChat.proposal.title', { action: proposal.action === 'buy' ? t('aiChat.action.buy') : t('aiChat.action.sell') })}</h3>
+
+            {/* AI recommendation reason */}
+            {proposal.reason && (
+              <div className="proposal-reason">{proposal.reason}</div>
+            )}
+
+            {/* Editable order form */}
+            <div className="proposal-form">
+              {/* Price input */}
+              <div className="form-field">
+                <label>{t('aiChat.proposal.field.price')}</label>
+                <div className="input-with-suffix">
+                  <input
+                    type="number"
+                    step="0.0001"
+                    min="0.0001"
+                    value={proposal.price}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v) && v > 0) {
+                        const newMax = proposal.balanceCurrency === 'USDC'
+                          ? (proposal.availableBalance || 0) * 0.98 / v
+                          : (proposal.availableBalance || 0) - 0.02
+                        setProposal({ ...proposal, price: v, maxQuantity: newMax })
+                      }
+                    }}
+                  />
+                  <span className="suffix">USDC</span>
+                </div>
+              </div>
+
+              {/* Quantity input */}
+              <div className="form-field">
+                <label>{t('aiChat.proposal.field.amount')}</label>
+                <div className="input-with-suffix">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.0001"
+                    max={proposal.maxQuantity}
+                    value={proposal.quantity}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v) && v > 0) {
+                        setProposal({ ...proposal, quantity: v })
+                      }
+                    }}
+                  />
+                  <span className="suffix">SUI</span>
+                </div>
+              </div>
+
+              {/* Percentage quick-buttons */}
+              {proposal.availableBalance != null && proposal.maxQuantity != null && (
+                <div className="form-field">
+                  <label>{t('aiChat.proposal.field.position')}</label>
+                  <div className="pct-buttons">
+                    {[0.25, 0.5, 0.75, 1.0].map(pct => {
+                      const qty = proposal.maxQuantity! * pct
+                      return (
+                        <button
+                          key={pct}
+                          className="pct-btn"
+                          onClick={() => setProposal({ ...proposal, quantity: parseFloat(qty.toFixed(4)) })}
+                          type="button"
+                        >
+                          {(pct * 100).toFixed(0)}%
+                          <span className="pct-qty">≈ {qty.toFixed(2)}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Balance and total info */}
+              <div className="form-info">
+                {proposal.availableBalance != null && (
+                  <div className="info-row">
+                    <span>{t('aiChat.proposal.available', { currency: proposal.balanceCurrency ?? '' })}</span>
+                    <span className="mono">{(proposal.availableBalance || 0).toFixed(2)} {proposal.balanceCurrency}</span>
+                  </div>
+                )}
+                {proposal.maxQuantity != null && proposal.maxQuantity > 0 && (
+                  <div className="info-row">
+                    <span>{proposal.action === 'buy' ? t('aiChat.proposal.max.buy') : t('aiChat.proposal.max.sell')}</span>
+                    <span className="mono">{proposal.maxQuantity.toFixed(4)} SUI</span>
+                  </div>
+                )}
+                <div className="info-row total">
+                  <span>{proposal.action === 'buy' ? t('aiChat.proposal.estimate.buy') : t('aiChat.proposal.estimate.sell')}</span>
+                  <span className="mono">{(proposal.price * proposal.quantity).toFixed(4)} {proposal.action === 'buy' ? 'USDC' : 'SUI'}</span>
+                </div>
+                {proposal.action === 'buy' && proposal.maxQuantity != null && proposal.price * proposal.quantity > (proposal.availableBalance || 0) * 0.98 && (
+                  <div className="info-warn">{t('aiChat.proposal.warn')}</div>
+                )}
+              </div>
             </div>
+
             <div className="proposal-actions">
               <button
                 className="btn btn-primary"
                 onClick={handleExecute}
-                disabled={executing}
+                disabled={
+                  executing ||
+                  proposal.quantity <= 0 ||
+                  (proposal.maxQuantity != null && proposal.quantity > proposal.maxQuantity) ||
+                  proposal.price <= 0
+                }
               >
-                {executing ? '执行中...' : '✅ 确认执行'}
+                {executing ? t('aiChat.proposal.executing') : t('aiChat.proposal.confirm')}
               </button>
               <button
                 className="btn btn-secondary"
                 onClick={handleReject}
                 disabled={executing}
               >
-                ❌ 拒绝
+                {t('aiChat.proposal.cancel')}
               </button>
             </div>
           </div>
@@ -346,14 +855,14 @@ function AIChatPage() {
         <div className="chat-input">
           <input
             type="text"
-            placeholder="描述你的交易需求..."
+            placeholder={t('aiChat.placeholder')}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             disabled={!account || loading || executing}
           />
           <button onClick={handleSend} disabled={!account || loading || !input.trim() || executing}>
-            发送
+            {t('aiChat.send')}
           </button>
         </div>
       </div>

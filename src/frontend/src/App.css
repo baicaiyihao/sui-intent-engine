@@ -68,6 +68,42 @@ html, body {
 .header-right {
   display: flex;
   align-items: center;
+  gap: 0.85rem;
+}
+
+/* Language toggle (ZH / EN) */
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 0;
+}
+
+.lang-segment {
+  padding: 0.32rem 0.7rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all 0.15s ease;
+  min-width: 32px;
+}
+
+.lang-segment:hover:not(.active) {
+  color: var(--text-secondary);
+}
+
+.lang-segment.active {
+  background: var(--accent-blue-dim);
+  color: var(--accent-blue);
 }
 
 .wallet-info {
@@ -778,7 +814,7 @@ small {
 .left-top {
   display: flex;
   flex-direction: row;
-  flex: 1;
+  height: 500px;
   min-height: 0;
   overflow: hidden;
 }
@@ -917,6 +953,14 @@ small {
 
 .orderbook-row.bid .price {
   color: var(--accent-green);
+}
+
+.orderbook-row .price.clickable {
+  cursor: pointer;
+}
+
+.orderbook-row .price.clickable:hover {
+  text-decoration: underline;
 }
 
 .orderbook-row .quantity,
@@ -1205,6 +1249,25 @@ small {
   pointer-events: none;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.market-price {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-blue);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.market-price .market-label {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
 }
 
 /* Percentage Slider */
@@ -1652,4 +1715,163 @@ small {
   white-space: pre-wrap;
   font-family: monospace;
   font-size: 0.8rem !important;
+}
+
+/* ==================== Balance Section (Trading Page) ==================== */
+.balance-section {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-primary);
+  padding: 0.75rem;
+}
+
+.balance-header {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  font-size: 0.75rem;
+}
+
+.balance-row.bm {
+  border-top: 1px dashed var(--border-primary);
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+}
+
+.balance-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.balance-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+
+.balance-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.balance-value.sui {
+  color: var(--accent-blue);
+}
+
+.balance-value.usdc {
+  color: var(--accent-green);
+}
+
+.btn-withdraw-small {
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-withdraw-small:hover:not(:disabled) {
+  background: var(--accent-red-dim);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.btn-withdraw-small:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.withdraw-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.withdraw-buttons .btn-withdraw-small {
+  flex: 1;
+  padding: 0.4rem;
+  font-size: 0.7rem;
+}
+
+.balance-sub-section {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border-secondary);
+}
+
+.balance-sub-section.claim {
+  border-top-color: var(--accent-yellow);
+  border-top-style: solid;
+}
+
+.balance-sub-section.claim .balance-label {
+  color: var(--accent-yellow);
+}
+
+.btn-claim {
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent-yellow);
+  border-radius: 4px;
+  color: var(--accent-yellow);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-claim:hover:not(:disabled) {
+  background: var(--accent-yellow-dim);
+}
+
+.btn-claim:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.balance-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-primary);
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.balance-total span:first-child {
+  color: var(--text-secondary);
+}
+
+.total-value {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.total-value.profit {
+  color: var(--accent-green);
+}
+
+.total-value.loss {
+  color: var(--accent-red);
 }

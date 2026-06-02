@@ -2,15 +2,40 @@ import { useState } from 'react'
 import './App.css'
 import TradingPage from './components/TradingPage'
 import AIChatPage from './components/AIChatPage'
+import AIStrategyPage from './components/AIStrategyPage'
 import { WalletProvider, useCurrentAccount, useDisconnectWallet, ConnectButton } from '@mysten/dapp-kit'
 import { SuiClientProvider } from '@mysten/dapp-kit'
+import { useI18n } from './i18n/I18nProvider'
 
-type Tab = 'ai' | 'trading'
+type Tab = 'ai' | 'strategy' | 'trading'
+
+function LangToggle() {
+  const { locale, setLocale } = useI18n()
+  return (
+    <div className="lang-toggle" role="group" aria-label="Language">
+      <button
+        className={`lang-segment ${locale === 'zh' ? 'active' : ''}`}
+        onClick={() => setLocale('zh')}
+        aria-pressed={locale === 'zh'}
+      >
+        ZH
+      </button>
+      <button
+        className={`lang-segment ${locale === 'en' ? 'active' : ''}`}
+        onClick={() => setLocale('en')}
+        aria-pressed={locale === 'en'}
+      >
+        EN
+      </button>
+    </div>
+  )
+}
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('trading')
   const account = useCurrentAccount()
   const { mutate: disconnect } = useDisconnectWallet()
+  const { t } = useI18n()
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
@@ -20,15 +45,16 @@ function AppContent() {
     <div className="app">
       <header className="header">
         <div className="header-left">
-          <h1>SUI Intent Engine</h1>
-          <p>DeepBook V3</p>
+          <h1>{t('app.title')}</h1>
+          <p>{t('app.subtitle')}</p>
         </div>
         <div className="header-right">
+          <LangToggle />
           {account ? (
             <div className="wallet-info">
               <span className="wallet-address">{formatAddress(account.address)}</span>
               <button className="btn btn-small" onClick={() => disconnect()}>
-                断开
+                {t('app.disconnect')}
               </button>
             </div>
           ) : (
@@ -42,23 +68,30 @@ function AppContent() {
           className={`tab ${activeTab === 'ai' ? 'active' : ''}`}
           onClick={() => setActiveTab('ai')}
         >
-          AI 策略
+          {t('nav.ai')}
+        </button>
+        <button
+          className={`tab ${activeTab === 'strategy' ? 'active' : ''}`}
+          onClick={() => setActiveTab('strategy')}
+        >
+          {t('nav.strategy')}
         </button>
         <button
           className={`tab ${activeTab === 'trading' ? 'active' : ''}`}
           onClick={() => setActiveTab('trading')}
         >
-          交易
+          {t('nav.trading')}
         </button>
       </nav>
 
       <main className="main">
         {activeTab === 'ai' && <AIChatPage />}
+        {activeTab === 'strategy' && <AIStrategyPage />}
         {activeTab === 'trading' && <TradingPage />}
       </main>
 
       <footer className="footer">
-        <p>SUI Intent Engine | Powered by DeepBook V3</p>
+        <p>{t('app.footer')}</p>
       </footer>
     </div>
   )

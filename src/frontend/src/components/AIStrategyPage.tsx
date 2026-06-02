@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useCurrentAccount, useSignTransaction, useSuiClient } from '@mysten/dapp-kit'
 import { Transaction } from '@mysten/sui/transactions'
+import { useI18n, TranslationKey } from '../i18n/I18nProvider'
 import './AIStrategyPage.css'
 
 // Backend APIs
@@ -90,7 +91,7 @@ interface QAEntry {
 
 interface QuickQuestion {
   type: string
-  label: string
+  labelKey: TranslationKey
   icon: string
   hint?: string
   // Visible in the default row based on decision
@@ -98,16 +99,16 @@ interface QuickQuestion {
 }
 
 const QUICK_QUESTIONS: QuickQuestion[] = [
-  // 默认 4 个（按 decision 动态）
-  { type: 'limit_price', label: '限价挂什么价？', icon: '🎯', decisions: ['BUY', 'SELL'] },
-  { type: 'maker_vs_taker', label: '挂单还是吃单好？', icon: '⚖️', decisions: ['BUY', 'SELL'] },
-  { type: 'bm_allocation', label: 'BM 资金怎么分？', icon: '💼', decisions: ['BUY', 'SELL'] },
-  { type: 'expired_order', label: '挂单过期怎么办？', icon: '⏰', decisions: ['BUY', 'SELL'] },
-  // 次级（"更多"展开）
-  { type: 'depth_check', label: '大单会砸穿吗？', icon: '🌊', decisions: ['BUY', 'SELL'] },
-  { type: 'liquidity_trend', label: '流动性趋势', icon: '📈', decisions: ['BUY', 'SELL', 'HOLD'] },
-  { type: 'reasoning', label: '为什么这样判断？', icon: '🤔', decisions: ['BUY', 'SELL', 'HOLD'] },
-  { type: 'multi_timeframe', label: '多周期一致吗？', icon: '🔄', decisions: ['BUY', 'SELL', 'HOLD'] },
+  // Default 4 (dynamically by decision)
+  { type: 'limit_price', labelKey: 'aiStrategy.qq.limitPrice', icon: '🎯', decisions: ['BUY', 'SELL'] },
+  { type: 'maker_vs_taker', labelKey: 'aiStrategy.qq.makerVsTaker', icon: '⚖️', decisions: ['BUY', 'SELL'] },
+  { type: 'bm_allocation', labelKey: 'aiStrategy.qq.bmAllocation', icon: '💼', decisions: ['BUY', 'SELL'] },
+  { type: 'expired_order', labelKey: 'aiStrategy.qq.expiredOrder', icon: '⏰', decisions: ['BUY', 'SELL'] },
+  // Secondary (shown when "more" is expanded)
+  { type: 'depth_check', labelKey: 'aiStrategy.qq.depthCheck', icon: '🌊', decisions: ['BUY', 'SELL'] },
+  { type: 'liquidity_trend', labelKey: 'aiStrategy.qq.liquidityTrend', icon: '📈', decisions: ['BUY', 'SELL', 'HOLD'] },
+  { type: 'reasoning', labelKey: 'aiStrategy.qq.reasoning', icon: '🤔', decisions: ['BUY', 'SELL', 'HOLD'] },
+  { type: 'multi_timeframe', labelKey: 'aiStrategy.qq.multiTimeframe', icon: '🔄', decisions: ['BUY', 'SELL', 'HOLD'] },
 ]
 
 function AIStrategyPage() {
@@ -135,6 +136,7 @@ function AIStrategyPage() {
   const account = useCurrentAccount()
   const { mutate: signTransaction } = useSignTransaction()
   const suiClient = useSuiClient()
+  const { t, locale } = useI18n()
 
   // ========== Data fetchers ==========
 
@@ -163,7 +165,7 @@ function AIStrategyPage() {
       const resp = await fetch(`${QUANT_API}/api/v1/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: 'SUI/USDT', timeframe: '1h', days: 7 })
+        body: JSON.stringify({ symbol: 'SUI/USDT', timeframe: '1h', days: 7, language: locale === 'zh' ? 'zh-CN' : 'en' })
       })
       const data = await resp.json()
       if (data.success && data.data) {
@@ -199,7 +201,7 @@ function AIStrategyPage() {
     const timeoutId = setTimeout(() => controller.abort(), 110000)
     try {
       const [signalResp, perfResp] = await Promise.all([
-        fetch(`${QUANT_API}/api/v1/ai/signal?symbol=SUI/USDT&timeframe=1h&days=7&language=zh-CN`, { signal: controller.signal }),
+        fetch(`${QUANT_API}/api/v1/ai/signal?symbol=SUI/USDT&timeframe=1h&days=7&language=${locale === 'zh' ? 'zh-CN' : 'en'}`, { signal: controller.signal }),
         fetch(`${QUANT_API}/api/v1/ai/performance?symbol=SUI/USDT&days=30`, { signal: controller.signal })
       ])
       clearTimeout(timeoutId)
@@ -209,46 +211,46 @@ function AIStrategyPage() {
       if (signalData.success && signalData.signal) {
         setAiSignal(signalData.signal)
       } else {
-        setError('AI 分析失败：' + (signalData.error || '请稍后再试'))
+        setError(t('aiStrategy.err.ai', { reason: signalData.error || t('deposit.err.unknown') }))
       }
       if (perfData.success && perfData.data) {
         setPerformance(perfData.data)
       }
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
-        setError('AI 分析超时（>110s）。请检查网络或稍后再试。')
+        setError(t('aiStrategy.err.aiTimeout'))
       } else {
-        setError('AI 分析错误: ' + (e as Error).message)
+        setError(t('aiStrategy.err.aiError', { reason: (e as Error).message }))
       }
     } finally {
       setLoadingAI(false)
     }
-  }, [])
+  }, [locale])
 
   // Quick question handler
   const askQuestion = useCallback(async (q: QuickQuestion) => {
     if (!aiSignal) return
-    if (askingType) return  // 防止同时发起多个请求
+    if (askingType) return  // Prevent multiple concurrent requests
 
     const id = `${q.type}-${Date.now()}`
     const entry: QAEntry = {
       id,
       type: q.type,
-      question: q.label,
+      question: t(q.labelKey),
       answer: null,
       loading: true,
       error: null,
       ts: Date.now(),
     }
-    setQaHistory(prev => [entry, ...prev].slice(0, 5))  // 最多保留 5 条
+    setQaHistory(prev => [entry, ...prev].slice(0, 5))  // Keep at most 5 entries
     setAskingType(q.type)
     setQaExpanded(true)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 100000)  // 100s 超时
+    const timeoutId = setTimeout(() => controller.abort(), 100000)  // 100s timeout
 
     try {
-      // 拼装 context
+      // Build context
       const ctx: Record<string, any> = {
         decision: aiSignal.decision,
         confidence: aiSignal.confidence,
@@ -263,12 +265,12 @@ function AIStrategyPage() {
         rsi: analysis?.indicators.rsi,
         macd: analysis?.indicators.macd,
         atr: analysis?.indicators.atr,
-        best_bid: ticker ? (ticker.lastPrice * 0.9995).toFixed(4) : '未知',
-        best_ask: ticker ? (ticker.lastPrice * 1.0005).toFixed(4) : '未知',
-        bid_depth: '约 ' + (ticker ? Math.round(ticker.volume24h * 0.005) : 0) + ' SUI',
-        ask_depth: '约 ' + (ticker ? Math.round(ticker.volume24h * 0.005) : 0) + ' SUI',
-        spread_bps: '约 5',
-        ask_levels: '10/20/50/100/200 SUI',
+        best_bid: ticker ? (ticker.lastPrice * 0.9995).toFixed(4) : t('aiChat.ctx.unknown'),
+        best_ask: ticker ? (ticker.lastPrice * 1.0005).toFixed(4) : t('aiChat.ctx.unknown'),
+        bid_depth: `${t('aiChat.ctx.depthPrefix')}${ticker ? Math.round(ticker.volume24h * 0.005) : 0}${t('aiChat.ctx.depthSuffix')}`,
+        ask_depth: `${t('aiChat.ctx.depthPrefix')}${ticker ? Math.round(ticker.volume24h * 0.005) : 0}${t('aiChat.ctx.depthSuffix')}`,
+        spread_bps: t('aiChat.ctx.spread'),
+        ask_levels: t('aiChat.ctx.askLevels'),
         volume_24h: ticker?.volume24h || 0,
         change_24h: ticker?.priceChangePercent || 0,
       }
@@ -279,7 +281,7 @@ function AIStrategyPage() {
         body: JSON.stringify({
           question_type: q.type,
           symbol: 'SUI/USDT',
-          language: 'zh-CN',
+          language: locale === 'zh' ? 'zh-CN' : 'en',
           context: ctx,
         }),
         signal: controller.signal,
@@ -289,18 +291,18 @@ function AIStrategyPage() {
       if (data.success) {
         setQaHistory(prev => prev.map(e => e.id === id ? { ...e, answer: data.answer, loading: false } : e))
       } else {
-        setQaHistory(prev => prev.map(e => e.id === id ? { ...e, error: data.detail || '未知错误', loading: false } : e))
+        setQaHistory(prev => prev.map(e => e.id === id ? { ...e, error: data.detail || t('aiStrategy.qqUnknown'), loading: false } : e))
       }
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
-        setQaHistory(prev => prev.map(en => en.id === id ? { ...en, error: '请求超时（>100s）', loading: false } : en))
+        setQaHistory(prev => prev.map(en => en.id === id ? { ...en, error: t('aiStrategy.qqTimeout'), loading: false } : en))
       } else {
         setQaHistory(prev => prev.map(en => en.id === id ? { ...en, error: (e as Error).message, loading: false } : en))
       }
     } finally {
       setAskingType(null)
     }
-  }, [aiSignal, analysis, ticker, quantity, walletSui, walletUsdc, askingType])
+  }, [aiSignal, analysis, ticker, quantity, walletSui, walletUsdc, askingType, locale, t])
 
   // Initial data load + ticker polling
   useEffect(() => {
@@ -333,13 +335,13 @@ function AIStrategyPage() {
     if (!aiSignal || !account) return
     const qty = parseFloat(quantity)
     if (isNaN(qty) || qty <= 0) {
-      setError('请输入有效数量')
+      setError(t('aiStrategy.err.invalidAmount'))
       return
     }
 
     const bmId = localStorage.getItem('balanceManagerId') || ''
     if (!bmId) {
-      setError('需要先在「交易」页面创建 BalanceManager')
+      setError(t('aiStrategy.err.noBm'))
       return
     }
 
@@ -374,7 +376,7 @@ function AIStrategyPage() {
         const usdcCoins: any[] = usdcData.result?.data || []
 
         if (usdcCoins.length === 0) {
-          setError('钱包中没有 USDC')
+          setError(t('aiStrategy.err.noUsdc'))
           setSubmitting(false)
           return
         }
@@ -430,28 +432,28 @@ function AIStrategyPage() {
                 options: { showEffects: true, showEvents: true }
               })
               if (exec.effects?.status?.status === 'success') {
-                setOrderResult(`✅ 订单已提交：${exec.digest.slice(0, 18)}...`)
+                setOrderResult(t('aiStrategy.orderOk', { digest: exec.digest.slice(0, 18) + '...' }))
                 setQuantity('')
               } else {
-                setError(`链上失败：${exec.effects?.status?.error || '未知错误'}`)
+                setError(t('aiStrategy.err.chainFailed', { reason: exec.effects?.status?.error || t('deposit.err.unknown') }))
               }
             } catch (e) {
-              setError('执行错误: ' + (e as Error).message)
+              setError(t('aiStrategy.err.exec', { reason: (e as Error).message }))
             } finally {
               setSubmitting(false)
             }
           },
           onError: (err: any) => {
-            setError(`签名被拒：${err?.message || err}`)
+            setError(t('aiStrategy.err.signRejected', { reason: err?.message || err }))
             setSubmitting(false)
           }
         }
       )
     } catch (e) {
-      setError('下单失败: ' + (e as Error).message)
+      setError(t('aiStrategy.err.orderFailed', { reason: (e as Error).message }))
       setSubmitting(false)
     }
-  }, [aiSignal, account, quantity, signTransaction, suiClient])
+  }, [aiSignal, account, quantity, signTransaction, suiClient, t])
 
   // ========== Render ==========
 
@@ -462,7 +464,7 @@ function AIStrategyPage() {
     n != null && !isNaN(n) ? (n >= 0 ? '+' : '') + n.toFixed(2) + '%' : '--'
 
   const decision = aiSignal?.decision || 'HOLD'
-  const decisionLabel = decision === 'BUY' ? '买入' : decision === 'SELL' ? '卖出' : '观望'
+  const decisionLabel = decision === 'BUY' ? t('aiStrategy.decision.buy') : decision === 'SELL' ? t('aiStrategy.decision.sell') : t('aiStrategy.decision.hold')
   const decisionClass = decision.toLowerCase()
   const bmId = localStorage.getItem('balanceManagerId') || ''
 
@@ -471,8 +473,8 @@ function AIStrategyPage() {
       <div className="ai-strategy-page">
         <div className="empty-state">
           <div className="empty-icon">🔌</div>
-          <h2>请先连接钱包</h2>
-          <p>连接 Sui Wallet 后即可使用 AI 量化策略</p>
+          <h2>{t('aiStrategy.connectWallet')}</h2>
+          <p>{t('aiStrategy.connectWalletHint')}</p>
         </div>
       </div>
     )
@@ -485,7 +487,7 @@ function AIStrategyPage() {
         <div className="section-header">
           <h2 className="section-title">
             <span className="title-mono">01</span>
-            <span>实时数据</span>
+            <span>{t('aiStrategy.section.liveData')}</span>
             <span className="title-sub">SUI / USDC</span>
           </h2>
           <div className="live-badge">
@@ -496,7 +498,7 @@ function AIStrategyPage() {
 
         <div className="data-grid">
           <div className={`data-card price-card ${ticker && ticker.priceChangePercent >= 0 ? 'positive' : 'negative'}`}>
-            <div className="data-label">最新价</div>
+            <div className="data-label">{t('aiStrategy.lastPrice')}</div>
             <div className="data-value-large">{ticker ? fmt(ticker.lastPrice) : (loadingData ? '...' : '--')}</div>
             <div className="data-change">
               {ticker ? fmtPct(ticker.priceChangePercent) : '--'}
@@ -505,19 +507,19 @@ function AIStrategyPage() {
           </div>
 
           <div className="data-card">
-            <div className="data-label">24H HIGH</div>
+            <div className="data-label">{t('aiStrategy.high24h')}</div>
             <div className="data-value">{ticker ? fmt(ticker.high24h) : '--'}</div>
             <div className="data-sub">{ticker && ticker.lastPrice ? ((ticker.high24h - ticker.lastPrice) / ticker.lastPrice * 100).toFixed(2) + '%' : ''}</div>
           </div>
 
           <div className="data-card">
-            <div className="data-label">24H LOW</div>
+            <div className="data-label">{t('aiStrategy.low24h')}</div>
             <div className="data-value">{ticker ? fmt(ticker.low24h) : '--'}</div>
             <div className="data-sub">{ticker && ticker.lastPrice ? ((ticker.low24h - ticker.lastPrice) / ticker.lastPrice * 100).toFixed(2) + '%' : ''}</div>
           </div>
 
           <div className="data-card">
-            <div className="data-label">24H VOL</div>
+            <div className="data-label">{t('aiStrategy.vol24h')}</div>
             <div className="data-value">
               {ticker ? (ticker.volume24h >= 1e6 ? (ticker.volume24h / 1e6).toFixed(2) + 'M' : ticker.volume24h >= 1e3 ? (ticker.volume24h / 1e3).toFixed(2) + 'K' : ticker.volume24h.toFixed(2)) : '--'}
             </div>
@@ -538,7 +540,7 @@ function AIStrategyPage() {
 
             <div className="indicator-pill">
               <span className="ipill-label">MACD</span>
-              <span className={`ipill-value ${analysis.macd_analysis === '金叉' ? 'positive' : analysis.macd_analysis === '死叉' ? 'negative' : 'neutral'}`}>
+              <span className={`ipill-value ${analysis.indicators.macd_hist != null ? (analysis.indicators.macd_hist >= 0 ? 'positive' : 'negative') : 'neutral'}`}>
                 {analysis.indicators.macd_hist != null ? (analysis.indicators.macd_hist >= 0 ? '▲' : '▼') + ' ' + Math.abs(analysis.indicators.macd_hist).toFixed(4) : '--'}
               </span>
               <span className="ipill-meta">{analysis.macd_analysis || ''}</span>
@@ -551,7 +553,7 @@ function AIStrategyPage() {
                   ? (analysis.indicators.boll_upper - analysis.current_price).toFixed(4)
                   : '--'}
               </span>
-              <span className="ipill-meta">距上轨</span>
+              <span className="ipill-meta">{t('aiStrategy.boll.upper')}</span>
             </div>
 
             <div className="indicator-pill">
@@ -559,7 +561,7 @@ function AIStrategyPage() {
               <span className="ipill-value neutral">
                 {analysis.indicators.atr != null ? analysis.indicators.atr.toFixed(4) : '--'}
               </span>
-              <span className="ipill-meta">波动率</span>
+              <span className="ipill-meta">{t('aiStrategy.atr')}</span>
             </div>
           </div>
         )}
@@ -568,23 +570,23 @@ function AIStrategyPage() {
         {analysis && (analysis.trend || analysis.support != null) && (
           <div className="analysis-strip">
             <div className="strip-item">
-              <span className="strip-label">趋势</span>
+              <span className="strip-label">{t('aiStrategy.trend')}</span>
               <span className={`strip-value trend-${analysis.trend}`}>
-                {analysis.trend === 'bullish' ? '↗ 看涨' : analysis.trend === 'bearish' ? '↘ 看跌' : '→ 震荡'}
+                {analysis.trend === 'bullish' ? t('aiStrategy.trend.bullish') : analysis.trend === 'bearish' ? t('aiStrategy.trend.bearish') : t('aiStrategy.trend.sideways')}
               </span>
             </div>
             <div className="strip-item">
-              <span className="strip-label">支撑位</span>
+              <span className="strip-label">{t('aiStrategy.support')}</span>
               <span className="strip-value mono">{fmt(analysis.support)}</span>
             </div>
             <div className="strip-item">
-              <span className="strip-label">阻力位</span>
+              <span className="strip-label">{t('aiStrategy.resistance')}</span>
               <span className="strip-value mono">{fmt(analysis.resistance)}</span>
             </div>
             <div className="strip-item">
-              <span className="strip-label">风险</span>
+              <span className="strip-label">{t('aiStrategy.risk')}</span>
               <span className={`strip-value risk-${analysis.risk_level}`}>
-                {analysis.risk_level === 'high' ? '高' : analysis.risk_level === 'low' ? '低' : '中'}
+                {analysis.risk_level === 'high' ? t('aiStrategy.risk.high') : analysis.risk_level === 'low' ? t('aiStrategy.risk.low') : t('aiStrategy.risk.medium')}
               </span>
             </div>
           </div>
@@ -596,20 +598,20 @@ function AIStrategyPage() {
         <div className="section-header">
           <h2 className="section-title">
             <span className="title-mono">02</span>
-            <span>AI 量化分析</span>
-            <span className="title-sub">多周期共识 · LLM 决策</span>
+            <span>{t('aiStrategy.section.aiAnalysis')}</span>
+            <span className="title-sub">{t('aiStrategy.section.aiSub')}</span>
           </h2>
         </div>
 
         {!aiSignal && !loadingAI && (
           <div className="ai-cta">
             <div className="ai-cta-text">
-              <h3>运行 AI 量化引擎</h3>
-              <p>调用多周期共识引擎（5m / 15m / 1h / 4h），综合 RSI / MACD / 布林带 / KDJ 给出方向、价格、止盈止损与置信度</p>
+              <h3>{t('aiStrategy.cta.title')}</h3>
+              <p>{t('aiStrategy.cta.desc')}</p>
             </div>
             <button className="btn-ai-primary" onClick={runAIAnalysis} disabled={loadingAI}>
               <span className="ai-icon">⚡</span>
-              <span>{loadingData ? '数据加载中…' : '开始分析'}</span>
+              <span>{loadingData ? t('aiStrategy.cta.loading') : t('aiStrategy.cta.start')}</span>
             </button>
           </div>
         )}
@@ -621,8 +623,8 @@ function AIStrategyPage() {
               <span /><span /><span /><span />
               <span /><span /><span /><span />
             </div>
-            <p className="loading-text">AI 正在分析多周期数据</p>
-            <p className="loading-sub">LLM 推理中 · 预计 60-90 秒 · 请勿关闭</p>
+            <p className="loading-text">{t('aiStrategy.loading')}</p>
+            <p className="loading-sub">{t('aiStrategy.loadingSub')}</p>
           </div>
         )}
 
@@ -635,7 +637,7 @@ function AIStrategyPage() {
                   <div className="rec-arrow">{decision === 'BUY' ? '↗' : decision === 'SELL' ? '↘' : '→'}</div>
                 </div>
                 <div>
-                  <div className="rec-eyebrow">AI 建议</div>
+                  <div className="rec-eyebrow">{t('aiStrategy.aiAdvice')}</div>
                   <div className="rec-action">{decisionLabel} SUI</div>
                 </div>
               </div>
@@ -656,27 +658,27 @@ function AIStrategyPage() {
                     <div className="conf-unit">%</div>
                   </div>
                 </div>
-                <div className="conf-label">置信度</div>
+                <div className="conf-label">{t('aiStrategy.confidence')}</div>
               </div>
             </div>
 
             {/* Price block */}
             <div className="rec-prices">
               <div className="price-block entry">
-                <div className="price-label">建议入场价</div>
+                <div className="price-label">{t('aiStrategy.entryPrice')}</div>
                 <div className="price-value">{fmt(aiSignal.entry_price)}</div>
                 <div className="price-meta">USDC</div>
               </div>
               <div className="price-arrow">→</div>
               <div className="price-block take-profit">
-                <div className="price-label">止盈</div>
+                <div className="price-label">{t('aiStrategy.takeProfit')}</div>
                 <div className="price-value">↑ {fmt(aiSignal.take_profit)}</div>
                 <div className="price-meta">
                   +{(((aiSignal.take_profit - aiSignal.entry_price) / aiSignal.entry_price) * 100).toFixed(2)}%
                 </div>
               </div>
               <div className="price-block stop-loss">
-                <div className="price-label">止损</div>
+                <div className="price-label">{t('aiStrategy.stopLoss')}</div>
                 <div className="price-value">↓ {fmt(aiSignal.stop_loss)}</div>
                 <div className="price-meta">
                   {(((aiSignal.stop_loss - aiSignal.entry_price) / aiSignal.entry_price) * 100).toFixed(2)}%
@@ -684,10 +686,10 @@ function AIStrategyPage() {
               </div>
             </div>
 
-            {/* Action recommendation — 明确的操作指令 */}
+            {/* Action recommendation — explicit operation instruction */}
             {aiSignal.action_recommendation && (
               <div className={`rec-action-bar ${decisionClass}`}>
-                <div className="action-bar-label">建议操作</div>
+                <div className="action-bar-label">{t('aiStrategy.suggestedAction')}</div>
                 <div className="action-bar-text">{aiSignal.action_recommendation}</div>
               </div>
             )}
@@ -700,7 +702,7 @@ function AIStrategyPage() {
               <div className="rec-reasons">
                 <h4>
                   <span className="reason-icon">◎</span>
-                  分析依据
+                  {t('aiStrategy.reasons')}
                 </h4>
                 <ol>
                   {aiSignal.key_reasons.map((r, i) => (
@@ -715,7 +717,7 @@ function AIStrategyPage() {
               <div className="rec-risks">
                 <h4>
                   <span className="reason-icon">⚠</span>
-                  风险提示
+                  {t('aiStrategy.risks')}
                 </h4>
                 <ul>
                   {aiSignal.risks.map((r, i) => (
@@ -730,56 +732,56 @@ function AIStrategyPage() {
               <div className="rec-performance">
                 <h4>
                   <span className="reason-icon">◈</span>
-                  AI 历史表现 · 近 30 天
+                  {t('aiStrategy.performance')}
                 </h4>
                 <div className="perf-stats">
                   <div className="perf-stat">
-                    <div className="perf-label">分析次数</div>
+                    <div className="perf-label">{t('aiStrategy.perf.total')}</div>
                     <div className="perf-value">{performance.total_analyses ?? '--'}</div>
                   </div>
                   <div className="perf-stat">
-                    <div className="perf-label">正确数</div>
+                    <div className="perf-label">{t('aiStrategy.perf.correct')}</div>
                     <div className="perf-value positive">{performance.correct_count ?? 0}</div>
                   </div>
                   <div className="perf-stat">
-                    <div className="perf-label">错误数</div>
+                    <div className="perf-label">{t('aiStrategy.perf.incorrect')}</div>
                     <div className="perf-value negative">{performance.incorrect_count ?? 0}</div>
                   </div>
                   <div className="perf-stat">
-                    <div className="perf-label">准确率</div>
+                    <div className="perf-label">{t('aiStrategy.perf.accuracy')}</div>
                     <div className={`perf-value ${(performance.accuracy ?? 0) >= 50 ? 'positive' : 'negative'}`}>
                       {performance.accuracy != null ? performance.accuracy.toFixed(1) + '%' : '--'}
                     </div>
                   </div>
                   <div className="perf-stat">
-                    <div className="perf-label">覆盖币种</div>
+                    <div className="perf-label">{t('aiStrategy.perf.symbols')}</div>
                     <div className="perf-value">{performance.unique_symbols ?? '--'}</div>
                   </div>
                 </div>
                 {(!performance.total_analyses || performance.total_analyses < 3) && (
-                  <div className="perf-hint">数据积累中 · 至少需要 3 次分析才有统计意义</div>
+                  <div className="perf-hint">{t('aiStrategy.perf.hint')}</div>
                 )}
               </div>
             )}
 
             <div className="rec-actions">
               <button className="btn-ai-secondary" onClick={runAIAnalysis} disabled={loadingAI}>
-                {loadingAI ? '分析中...' : '↻ 重新分析'}
+                {loadingAI ? t('aiStrategy.reanalyzing') : t('aiStrategy.reanalyze')}
               </button>
             </div>
 
-            {/* Quick question chips - 围绕 SUI/USDC + DeepBook V3 */}
+            {/* Quick question chips - centered around SUI/USDC + DeepBook V3 */}
             <div className="quick-q-section">
               <div className="quick-q-header">
-                <span className="quick-q-title">⚡ 快速追问</span>
-                <span className="quick-q-sub">围绕 SUI/USDC + DeepBook V3</span>
+                <span className="quick-q-title">{t('aiStrategy.qqTitle')}</span>
+                <span className="quick-q-sub">{t('aiStrategy.qqSub')}</span>
               </div>
               <div className="quick-q-chips">
                 {(() => {
                   const decision = aiSignal.decision
-                  // 默认显示 4 个匹配的
+                  // Default: show 4 matching items
                   const primary = QUICK_QUESTIONS.filter(q => q.decisions.includes(decision)).slice(0, 4)
-                  // "更多" 中显示剩下的
+                  // Show the rest in "more"
                   const primaryTypes = new Set(primary.map(q => q.type))
                   const secondary = QUICK_QUESTIONS.filter(q => !primaryTypes.has(q.type))
                   const visible = showMore ? [...primary, ...secondary] : primary
@@ -791,7 +793,7 @@ function AIStrategyPage() {
                       disabled={!!askingType}
                     >
                       <span className="qq-icon">{askingType === q.type ? '⏳' : q.icon}</span>
-                      <span className="qq-label">{q.label}</span>
+                      <span className="qq-label">{t(q.labelKey)}</span>
                     </button>
                   ))
                 })()}
@@ -804,16 +806,16 @@ function AIStrategyPage() {
                 if (secondary.length === 0) return null
                 return (
                   <button className="qq-more-btn" onClick={() => setShowMore(!showMore)}>
-                    {showMore ? '收起 ▲' : `更多 ${secondary.length} 个 ▼`}
+                    {showMore ? t('aiStrategy.qqLess') : t('aiStrategy.qqMore', { count: secondary.length })}
                   </button>
                 )
               })()}
 
-              {/* 历史问答 */}
+              {/* Q&A history */}
               {qaHistory.length > 0 && (
                 <div className="qa-history">
                   <div className="qa-history-header" onClick={() => setQaExpanded(!qaExpanded)}>
-                    <span className="qa-history-title">💬 对话记录 ({qaHistory.length})</span>
+                    <span className="qa-history-title">{t('aiStrategy.qqHistory', { count: qaHistory.length })}</span>
                     <span className="qa-history-toggle">{qaExpanded ? '▼' : '▶'}</span>
                   </div>
                   {qaExpanded && (
@@ -830,7 +832,7 @@ function AIStrategyPage() {
                               {entry.loading ? (
                                 <div className="qa-loading">
                                   <span className="qa-spinner">⏳</span>
-                                  <span>LLM 推理中 · 预计 30-60 秒...</span>
+                                  <span>{t('aiStrategy.qqLoading')}</span>
                                 </div>
                               ) : entry.error ? (
                                 <div className="qa-error">⚠ {entry.error}</div>
@@ -856,8 +858,8 @@ function AIStrategyPage() {
           <div className="section-header">
             <h2 className="section-title">
               <span className="title-mono">03</span>
-              <span>一键下单</span>
-              <span className="title-sub">填数量 → 签名 → 上链</span>
+              <span>{t('aiStrategy.section.oneClick')}</span>
+              <span className="title-sub">{t('aiStrategy.section.oneClickSub')}</span>
             </h2>
             <div className={`order-direction-tag ${decisionClass}`}>
               {decisionLabel}
@@ -867,15 +869,15 @@ function AIStrategyPage() {
           <div className="order-panel">
             <div className="balance-row">
               <div className="balance-item">
-                <div className="balance-label">SUI 余额</div>
+                <div className="balance-label">{t('aiStrategy.balanceSui')}</div>
                 <div className="balance-amount">{walletSui.toFixed(4)}</div>
               </div>
               <div className="balance-item">
-                <div className="balance-label">USDC 余额</div>
+                <div className="balance-label">{t('aiStrategy.balanceUsdc')}</div>
                 <div className="balance-amount">{walletUsdc.toFixed(2)}</div>
               </div>
               <div className="balance-item">
-                <div className="balance-label">建议仓位</div>
+                <div className="balance-label">{t('aiStrategy.positionSize')}</div>
                 <div className="balance-amount">
                   {aiSignal.position_size_pct ?? 10}%
                 </div>
@@ -884,7 +886,7 @@ function AIStrategyPage() {
 
             <div className="order-form">
               <div className="form-row">
-                <label>数量</label>
+                <label>{t('aiStrategy.field.amount')}</label>
                 <div className="input-with-suffix">
                   <input
                     type="number"
@@ -892,7 +894,7 @@ function AIStrategyPage() {
                     min="0.1"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    placeholder={decision === 'BUY' ? '买入 SUI 数量' : '卖出 SUI 数量'}
+                    placeholder={decision === 'BUY' ? t('aiStrategy.placeholder.buy') : t('aiStrategy.placeholder.sell')}
                   />
                   <span className="suffix">SUI</span>
                 </div>
@@ -911,15 +913,15 @@ function AIStrategyPage() {
               {quantity && parseFloat(quantity) > 0 && (
                 <div className="order-preview">
                   <div className="preview-row">
-                    <span>价格</span>
+                    <span>{t('aiStrategy.preview.price')}</span>
                     <span className="mono">{fmt(aiSignal.entry_price)} USDC</span>
                   </div>
                   <div className="preview-row">
-                    <span>数量</span>
+                    <span>{t('aiStrategy.preview.amount')}</span>
                     <span className="mono">{parseFloat(quantity).toFixed(4)} SUI</span>
                   </div>
                   <div className="preview-row total">
-                    <span>总计</span>
+                    <span>{t('aiStrategy.preview.total')}</span>
                     <span className="mono">{(parseFloat(quantity) * aiSignal.entry_price).toFixed(4)} USDC</span>
                   </div>
                 </div>
@@ -931,14 +933,14 @@ function AIStrategyPage() {
                 disabled={submitting || !quantity || parseFloat(quantity) <= 0 || !bmId}
               >
                 {submitting ? (
-                  <span>处理中...</span>
+                  <span>{t('aiStrategy.preview.processing')}</span>
                 ) : (
                   <>
                     <span className="execute-icon">
                       {decision === 'BUY' ? '▲' : '▼'}
                     </span>
                     <span>
-                      一键 {decisionLabel} @ {fmt(aiSignal.entry_price)} USDC
+                      {t('aiStrategy.btn.execute', { decision: decisionLabel, price: fmt(aiSignal.entry_price) })}
                     </span>
                   </>
                 )}
@@ -946,7 +948,7 @@ function AIStrategyPage() {
 
               {!bmId && (
                 <div className="hint">
-                  ⚠ 需要先在「交易」页面创建 BalanceManager
+                  {t('aiStrategy.bmHint')}
                 </div>
               )}
 
