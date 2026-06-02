@@ -61,7 +61,8 @@ class AITradingSignal:
         default_signal = {
             "decision": "HOLD",
             "confidence": 50,
-            "summary": "等待更明确信号",
+            "action_recommendation": "等待更明确信号，暂不操作",
+            "summary": "市场信号不够明确，建议等待更清晰的方向确认。建议操作：观望。",
             "entry_price": current_price,
             "stop_loss": round(current_price * 0.97, 4),
             "take_profit": round(current_price * 1.05, 4),
@@ -75,6 +76,79 @@ class AITradingSignal:
         }
 
         signal = self.llm.safe_call_llm(system_prompt, user_prompt, default_signal)
+
+        # 如果 LLM 失败（仍为默认 HOLD）但 consensus 评分有效，用评分推导信号
+        try:
+            is_fallback = (
+                signal.get("summary") == default_signal["summary"] and
+                signal.get("key_reasons") == default_signal["key_reasons"]
+            )
+        except Exception:
+            is_fallback = False
+        if is_fallback and consensus_score != 0 and all_data:
+            primary_tf = next(iter(all_data.keys()), None)
+            primary = all_data.get(primary_tf, {}) if primary_tf else {}
+            atr = primary.get("atr") or (current_price * 0.02)
+            confidence = min(85, max(50, int(50 + abs(consensus_score))))
+            if consensus_score > 15:
+                signal["decision"] = "BUY"
+                signal["confidence"] = confidence
+                signal["entry_price"] = round(current_price, 4)
+                signal["stop_loss"] = round(current_price - atr * 1.5, 4)
+                signal["take_profit"] = round(current_price + atr * 2.5, 4)
+                signal["position_size_pct"] = min(50, max(10, int(abs(consensus_score))))
+                signal["summary"] = f"多周期共识偏多（评分 +{consensus_score:.1f}），多周期技术指标同向看涨。建议操作：可在 ${signal['entry_price']} 附近分批建仓 {signal['position_size_pct']}% 仓位，止损 ${signal['stop_loss']}，止盈 ${signal['take_profit']}。"
+                signal["action_recommendation"] = f"在 ${signal['entry_price']} 附近分批买入 {signal['position_size_pct']}% 仓位，止损 ${signal['stop_loss']}，止盈 ${signal['take_profit']}"
+            elif consensus_score < -15:
+                signal["decision"] = "SELL"
+                signal["confidence"] = confidence
+                signal["entry_price"] = round(current_price, 4)
+                signal["stop_loss"] = round(current_price + atr * 1.5, 4)
+                signal["take_profit"] = round(current_price - atr * 2.5, 4)
+                signal["position_size_pct"] = min(50, max(10, int(abs(consensus_score))))
+                signal["summary"] = f"多周期共识偏空（评分 {consensus_score:.1f}），多周期技术指标同向看跌。建议操作：可在 ${signal['entry_price']} 附近分批做空或减仓 {signal['position_size_pct']}%，止损 ${signal['stop_loss']}，止盈 ${signal['take_profit']}。"
+                signal["action_recommendation"] = f"在 ${signal['entry_price']} 附近分批卖出 {signal['position_size_pct']}% 仓位，止损 ${signal['stop_loss']}，止盈 ${signal['take_profit']}"
+            else:
+                signal["decision"] = "HOLD"
+                signal["confidence"] = 50
+                signal["summary"] = f"多周期共识中性（评分 {consensus_score:.1f}），多空力量均衡无明确方向。建议操作：观望，等待方向突破或回踩关键支撑/阻力位后再行动。"
+                signal["action_recommendation"] = "当前多空均衡，建议观望等待方向突破"
+            # 用客观数据生成理由
+            reasons = []
+            if primary.get("rsi") is not None:
+                rsi = primary["rsi"]
+                if rsi < 30: reasons.append(f"RSI {rsi:.1f} 进入超卖区")
+                elif rsi > 70: reasons.append(f"RSI {rsi:.1f} 进入超买区")
+                else: reasons.append(f"RSI {rsi:.1f} 中性区间")
+            if primary.get("macd") is not None and primary.get("macd_signal") is not None:
+                if primary["macd"] > primary["macd_signal"]:
+                    reasons.append("MACD 金叉状态")
+                else:
+                    reasons.append("MACD 死叉状态")
+            if primary.get("adx") is not None and primary["adx"] > 25:
+                reasons.append(f"ADX {primary['adx']:.1f} 趋势较强")
+            if primary.get("change_1d") is not None:
+                chg = primary["change_1d"]
+                reasons.append(f"1日变化 {chg:+.2f}%")
+            if not reasons:
+                reasons = [f"基于 {','.join(all_data.keys())} 多周期共识评分"]
+            signal["key_reasons"] = reasons
+            signal["risks"] = ["未启用 LLM，信号基于规则推导，请人工复核"]
+            signal["technical_score"] = max(0, min(100, int(50 + consensus_score)))
+
+        # 兜底：如果 LLM 没返回 action_recommendation，从已有字段推导一个
+        if not signal.get("action_recommendation"):
+            decision = signal.get("decision", "HOLD")
+            ep = signal.get("entry_price", current_price)
+            sl = signal.get("stop_loss", round(current_price * 0.97, 4))
+            tp = signal.get("take_profit", round(current_price * 1.05, 4))
+            pct = signal.get("position_size_pct", 10)
+            if decision == "BUY":
+                signal["action_recommendation"] = f"在 ${ep} 附近分批买入 {pct}% 仓位，止损 ${sl}，止盈 ${tp}"
+            elif decision == "SELL":
+                signal["action_recommendation"] = f"在 ${ep} 附近分批卖出 {pct}% 仓位，止损 ${sl}，止盈 ${tp}"
+            else:
+                signal["action_recommendation"] = "当前多空均衡，建议观望等待方向突破"
 
         # 计算趋势展望
         trend_outlook = self._calculate_trend_outlook(objective_by_tf, consensus_score)
@@ -209,7 +283,9 @@ class AITradingSignal:
             atr_adx = atr  # 复用前面计算的 ATR
             plus_di = 100 * (plus_dm.ewm(alpha=1/14).mean() / atr_adx) if atr_adx > 0 else 0
             minus_di = 100 * (minus_dm.ewm(alpha=1/14).mean() / atr_adx) if atr_adx > 0 else 0
-            dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di) if (plus_di + minus_di) > 0 else 0
+            # plus_di/minus_di 是 Series，divisor 也要是 Series
+            sum_di = plus_di + minus_di
+            dx = 100 * abs(plus_di - minus_di) / sum_di.replace(0, 1)
             adx = float(dx.ewm(alpha=1/14).mean().iloc[-1]) if len(df) >= 14 else 25
 
             # 价格变化
@@ -488,12 +564,13 @@ class AITradingSignal:
 
 请根据以上策略配置，结合技术指标给出交易建议。"""
 
-        system_prompt = f"""你是一个专业的加密货币交易分析师。基于多周期技术分析数据和用户策略配置，给出明确的交易建议。
+        system_prompt = f"""你是一个专业的加密货币交易分析师。基于多周期技术分析数据和用户策略配置，给出明确、可执行、不模棱两可的交易建议。
 
 输出格式(JSON):
 {{
     "decision": "BUY|SELL|HOLD",
     "confidence": 0-100,
+    "action_recommendation": "一句话明确的可执行操作指令",
     "summary": "简要分析总结",
     "entry_price": 建议入场价,
     "stop_loss": 止损价,
@@ -509,9 +586,20 @@ class AITradingSignal:
 
 注意:
 - decision: BUY=买入, SELL=卖出, HOLD=观望
-- confidence: 越高表示信号越确定(60以上才是有效信号)
+- confidence: 越高表示信号越确定。**禁用"为了安全起见给个低分"这种保守倾向** —— 应当基于多周期共识评分与技术指标的实际强度给出真实判断:
+    * 共识评分绝对值 >= 30 且多周期同向 → confidence 应在 70-90
+    * 共识评分绝对值 15-30 且有 2 个周期同向 → confidence 应在 60-75
+    * 共识评分绝对值 < 15 或多周期矛盾 → confidence 50-60 (观望)
+    * 单边强信号(ADX>40 + MACD 同向 + 价格突破) → confidence 可达 85-95
+- action_recommendation: 必须是**具体可执行**的一句话操作指令，不要泛泛而谈。示例:
+    * "立即在 $0.865 附近买入 30% 仓位，止损 $0.840，止盈 $0.920"
+    * "等待回调至 $0.840-0.850 区间后买入，止损下破 $0.820 离场"
+    * "当前处于震荡区间，建议观望不操作，等待方向突破"
+    * "立即卖出 50% 仓位，止损 $0.890，止盈 $0.820"
+    * "反弹至 $0.880 阻力位附近做空，止损 $0.895，止盈 $0.840"
 - 入场/止损/止盈价格必须是具体数字
-- key_reasons: 给出3个最关键的理由
+- key_reasons: 给出3个最关键的理由（基于具体技术指标读数）
+- summary: 100字以内的简明总结，必须在最后明确写出"建议操作：XXXXX"
 - 必须严格遵循用户策略配置的指标阈值"""
 
         # 主周期数据
@@ -548,12 +636,21 @@ class AITradingSignal:
 - 布林中轨: ${primary_data.get('boll_mid', 0):.4f}
 - 布林下轨: ${primary_data.get('boll_lower', 0):.4f}
 - ATR: {primary_data.get('atr', 0):.4f}
+- ADX: {primary_data.get('adx', 0):.1f}
+- KDJ(K/D/J): {primary_data.get('kdj_k', 0):.1f} / {primary_data.get('kdj_d', 0):.1f} / {primary_data.get('kdj_j', 0):.1f}
 - 波动率: {primary_data.get('volatility', 0):.2f}%
 - 1h涨跌: {primary_data.get('change_1h', 0):.2f}%
 - 4h涨跌: {primary_data.get('change_4h', 0):.2f}%
 - 日涨跌: {primary_data.get('change_1d', 0):.2f}%
+- 量比(vol/current_avg): {primary_data.get('volume_ratio', 0):.2f}
 
-请给出交易建议（严格遵循用户策略配置的指标条件）:"""
+要求:
+1. 给出明确的 decision (BUY/SELL/HOLD)，不要回避方向
+2. confidence 必须与信号强度匹配（参考系统提示中的评分标准）
+3. action_recommendation 必须是可直接执行的操作指令（含价格、仓位比例或触发条件）
+4. summary 最后必须明确"建议操作：XXXXX"
+
+请严格基于上述指标数据给出交易建议:"""
 
         return system_prompt, user_prompt
 
