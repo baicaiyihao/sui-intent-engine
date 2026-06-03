@@ -1,5 +1,5 @@
 /* ==================== Layout ==================== */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 
 html, body {
   height: 100%;
@@ -63,6 +63,26 @@ html, body {
   opacity: 0.5;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* Home button: title + subtitle act as "← Home" trigger in app view */
+.header-home-btn {
+  display: block;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+}
+.header-home-btn:hover { opacity: 0.75; }
+.header-home-btn:focus-visible {
+  outline: 1px solid var(--accent-blue);
+  outline-offset: 4px;
 }
 
 .header-right {

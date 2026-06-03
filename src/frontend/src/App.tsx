@@ -3,11 +3,13 @@ import './App.css'
 import TradingPage from './components/TradingPage'
 import AIChatPage from './components/AIChatPage'
 import AIStrategyPage from './components/AIStrategyPage'
+import { LandingPage } from './components/LandingPage'
 import { WalletProvider, useCurrentAccount, useDisconnectWallet, ConnectButton } from '@mysten/dapp-kit'
 import { SuiClientProvider } from '@mysten/dapp-kit'
 import { useI18n } from './i18n/I18nProvider'
 
 type Tab = 'ai' | 'strategy' | 'trading'
+type View = 'landing' | 'app'
 
 function LangToggle() {
   const { locale, setLocale } = useI18n()
@@ -32,6 +34,7 @@ function LangToggle() {
 }
 
 function AppContent() {
+  const [view, setView] = useState<View>('landing')
   const [activeTab, setActiveTab] = useState<Tab>('trading')
   const account = useCurrentAccount()
   const { mutate: disconnect } = useDisconnectWallet()
@@ -41,12 +44,23 @@ function AppContent() {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
   }
 
+  if (view === 'landing') {
+    return <LandingPage onEnterApp={() => setView('app')} />
+  }
+
   return (
     <div className="app">
       <header className="header">
         <div className="header-left">
-          <h1>{t('app.title')}</h1>
-          <p>{t('app.subtitle')}</p>
+          <button
+            className="header-home-btn"
+            onClick={() => setView('landing')}
+            type="button"
+            aria-label={t('landing.nav.home')}
+          >
+            <h1>{t('app.title')}</h1>
+            <p>{t('app.subtitle')}</p>
+          </button>
         </div>
         <div className="header-right">
           <LangToggle />
