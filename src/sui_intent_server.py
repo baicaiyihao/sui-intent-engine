@@ -134,11 +134,14 @@ async def lifespan(app: FastAPI):
     from sui.deepbook_cache import get_deepbook_cache
 
     async def auto_refresh_cache():
-        """Background task to auto-refresh cache every 10 seconds"""
+        """Background task to auto-refresh cache every 10 seconds.
+        Runs the sync cache.refresh_all() in a thread so it doesn't block
+        the event loop (it makes blocking HTTP calls to the deepbook indexer)."""
         while True:
             try:
                 cache = get_deepbook_cache()
-                cache.refresh_all()
+                # Offload sync I/O to a worker thread so the event loop stays free
+                await asyncio.to_thread(cache.refresh_all)
                 print(f"[Cache] Auto-refreshed at {datetime.now().isoformat()}")
             except Exception as e:
                 print(f"[Cache] Auto-refresh error: {e}")
@@ -194,14 +197,16 @@ async def get_market_price(symbol: str):
     """Get current market price for a symbol"""
     try:
         ds = ExchangeDataSource("binance")
-        # Normalize symbol - CCXT expects format like "SUI/USDT"
-        normalized = symbol.upper()
-        if '/' not in normalized and 'USDT' not in normalized:
+        # Normalize symbol - CCXT expects format like "SUI/USDT".
+        # Accept inputs like "SUI", "SUI/USDT", "SUI_USDT", "SUI-USDT", "sui".
+        normalized = symbol.upper().replace("_", "/").replace("-", "/")
+        # If still no quote currency, assume USDT
+        if "/" not in normalized:
             normalized = f"{normalized}/USDT"
         ticker = ds.fetch_ticker(normalized)
         return {
             "success": True,
-            "symbol": symbol.upper(),
+            "symbol": normalized,
             "price": ticker.get("last"),
             "bid": ticker.get("bid"),
             "ask": ticker.get("ask"),

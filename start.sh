@@ -139,8 +139,8 @@ ensure_node_deps() {
 
 # ---------- start a single service ----------
 start_service() {
-  local name=$1 port=$2 logfile=$3 pidfile=$4
-  shift 4
+  local max_wait=$1 name=$2 port=$3 logfile=$4 pidfile=$5
+  shift 5
   if is_listening "$port"; then
     local existing
     existing=$(port_owner "$port")
@@ -148,15 +148,16 @@ start_service() {
     note "$name :$port already running (pid=$existing)"
     return
   fi
-  say "starting $name on :$port (log: $logfile)"
+  say "starting $name on :$port (log: $logfile, max_wait=${max_wait}s)"
   nohup "$@" >"$ROOT/$logfile" 2>&1 &
   local wrapper_pid=$!
   disown "$wrapper_pid" 2>/dev/null || true
-  # Backends do heavy lifespan init (DB, deepbook indexer, LLM client) — give them up to 15s.
-  # Then read the REAL pid from the port listener, since `$!` is the nohup wrapper
-  # and may differ from the actual python process on BSD nohup.
+  # Backends do heavy lifespan init (DB, deepbook indexer sync via sync I/O in
+  # the event loop, LLM client). Then read the REAL pid from the port listener,
+  # since `$!` is the nohup wrapper and may differ from the actual python
+  # process on BSD nohup.
   local real_pid=""
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  for i in $(seq 1 "$max_wait"); do
     if is_listening "$port"; then
       real_pid=$(port_owner "$port")
       break
@@ -170,7 +171,7 @@ start_service() {
     echo "$real_pid" > "$ROOT/$pidfile"
     say "$name :$port up (pid=$real_pid, after ${i}s)"
   else
-    warn "$name :$port did not bind in 15s — check $logfile"
+    warn "$name :$port did not bind in ${max_wait}s — check $logfile"
     echo "$wrapper_pid" > "$ROOT/$pidfile"
   fi
 }
@@ -188,17 +189,17 @@ ensure_python_deps
 ensure_node_deps
 
 # Backend A — QuantCore AI (port 8000)
-start_service "backend-A (QuantCore AI)" 8000 \
+start_service 15 "backend-A (QuantCore AI)" 8000 \
   logs/backend-A.log .pids/8000.pid \
   "${PYTHON_CMD[@]}" -m uvicorn src.server:app --host 0.0.0.0 --port 8000
 
-# Backend B — SuiIntent (port 8001)
-start_service "backend-B (SuiIntent)" 8001 \
+# Backend B — SuiIntent (port 8001) — mainnet deepbook indexer can be slow on cold start
+start_service 60 "backend-B (SuiIntent)" 8001 \
   logs/backend-B.log .pids/8001.pid \
   "${PYTHON_CMD[@]}" -m uvicorn src.sui_intent_server:app --host 0.0.0.0 --port 8001
 
 # Frontend — Vite (port 3000)
-start_service "frontend (Vite + React)" 3000 \
+start_service 15 "frontend (Vite + React)" 3000 \
   logs/frontend.log .pids/3000.pid \
   npm --prefix "$ROOT/src/frontend" run dev -- --host 0.0.0.0
 
