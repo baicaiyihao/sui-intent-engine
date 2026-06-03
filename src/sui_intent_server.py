@@ -5,11 +5,15 @@ SUI 意图驱动交易引擎 API
 """
 import sys
 import os
+from pathlib import Path
 
 # Add src to path for imports
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 if _current_dir not in sys.path:
     sys.path.insert(0, _current_dir)
+
+# Resolve static dir relative to this file (works regardless of CWD)
+_STATIC_DIR = Path(__file__).parent / "static"
 
 import asyncio
 from datetime import datetime
@@ -438,7 +442,7 @@ async def get_cached_orderbook():
 @app.get("/")
 async def root():
     """Root endpoint - serve UI"""
-    return FileResponse("static/index.html")
+    return FileResponse(_STATIC_DIR / "index.html")
 
 
 @app.post("/intent/parse", response_model=IntentParseResponse)
@@ -699,7 +703,7 @@ async def websocket_endpoint(websocket: WebSocket):
 # Run Server
 # ============================================================================
 
-def run_server(host: str = "0.0.0.0", port: int = 8080):
+def run_server(host: str = "0.0.0.0", port: int = 8001):
     """Run the FastAPI server"""
     uvicorn.run(
         "sui_intent_server:app",
