@@ -23,7 +23,7 @@ interface Order {
 
 function OrdersPanel() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
   const [cancelingId, setCancelingId] = useState<string | null>(null)
   const account = useCurrentAccount()
   const { mutate: signTransaction } = useSignTransaction()
@@ -175,11 +175,6 @@ function OrdersPanel() {
       fetchOrdersFromChain()
     }
   }, [account, fetchOrdersFromChain])
-
-  // Refresh orders
-  const handleRefresh = useCallback(() => {
-    fetchOrdersFromChain()
-  }, [fetchOrdersFromChain])
 
   // Cancel order
   const handleCancel = useCallback((order: Order) => {

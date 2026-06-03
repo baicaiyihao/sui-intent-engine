@@ -37,7 +37,7 @@ function DepositPanel({ onDepositSuccess, selectedPrice, marketPrice, onPriceUse
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [walletCoins, setWalletCoins] = useState<{sui: string[], usdc: string[]}>({ sui: [], usdc: [] })
+  const [walletCoins, setWalletCoins] = useState<{sui: string[], usdc: { id: string, balance: string }[]}>({ sui: [], usdc: [] })
   const account = useCurrentAccount()
   const { mutate: signTransaction } = useSignTransaction()
   const suiClient = useSuiClient()
@@ -181,11 +181,11 @@ function DepositPanel({ onDepositSuccess, selectedPrice, marketPrice, onPriceUse
             deepZero,
             tx.pure.u8(0), // self_matching
             tx.pure.u8(0), // order_type (NO_RESTRICTION)
-            priceU64,
-            quantityMIST,
+            tx.pure.u64(priceU64),
+            tx.pure.u64(quantityMIST),
             tx.pure.bool(false), // is_bid = false (sell)
             tx.pure.bool(feeToken === 'DEEP'),
-            expireTime,
+            tx.pure.u64(expireTime),
             tx.object.clock(),
           ],
           typeArguments: [SUI_COIN, USDC_COIN],
@@ -203,10 +203,10 @@ function DepositPanel({ onDepositSuccess, selectedPrice, marketPrice, onPriceUse
             usdcZero,
             deepZero,
             tx.pure.u8(0), // self_matching
-            quantityMIST,
+            tx.pure.u64(quantityMIST),
             tx.pure.bool(false), // is_bid = false (sell)
             tx.pure.bool(feeToken === 'DEEP'),
-            priceU64,
+            tx.pure.u64(priceU64),
             tx.object.clock(),
           ],
           typeArguments: [SUI_COIN, USDC_COIN],
@@ -259,11 +259,11 @@ function DepositPanel({ onDepositSuccess, selectedPrice, marketPrice, onPriceUse
             deepZero,
             tx.pure.u8(0), // self_matching
             tx.pure.u8(0), // order_type (NO_RESTRICTION)
-            priceU64,
-            quantityMIST,
+            tx.pure.u64(priceU64),
+            tx.pure.u64(quantityMIST),
             tx.pure.bool(true), // is_bid = true (buy)
             tx.pure.bool(feeToken === 'DEEP'),
-            expireTime,
+            tx.pure.u64(expireTime),
             tx.object.clock(),
           ],
           typeArguments: [SUI_COIN, USDC_COIN],
@@ -281,10 +281,10 @@ function DepositPanel({ onDepositSuccess, selectedPrice, marketPrice, onPriceUse
             usdcSplit,
             deepZero,
             tx.pure.u8(0), // self_matching
-            quantityMIST,
+            tx.pure.u64(quantityMIST),
             tx.pure.bool(true), // is_bid = true (buy)
             tx.pure.bool(feeToken === 'DEEP'),
-            priceU64,
+            tx.pure.u64(priceU64),
             tx.object.clock(),
           ],
           typeArguments: [SUI_COIN, USDC_COIN],

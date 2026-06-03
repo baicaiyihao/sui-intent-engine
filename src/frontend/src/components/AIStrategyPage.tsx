@@ -397,8 +397,8 @@ function AIStrategyPage() {
           arguments: [
             tx.object(GLOBAL_CONFIG), tx.object(CETUS_BM_INDEXER), tx.object(SUI_USDC_POOL), tx.object(bmId),
             suiZero, usdcSplit, deepZero,
-            tx.pure.u8(0), tx.pure.u8(0), priceU64, quantityMIST,
-            tx.pure.bool(true), tx.pure.bool(false), expireTime, tx.object.clock()
+            tx.pure.u8(0), tx.pure.u8(0), tx.pure.u64(priceU64), tx.pure.u64(quantityMIST),
+            tx.pure.bool(true), tx.pure.bool(false), tx.pure.u64(expireTime), tx.object.clock()
           ],
           typeArguments: [SUI_COIN, USDC_COIN]
         })
@@ -414,8 +414,8 @@ function AIStrategyPage() {
           arguments: [
             tx.object(GLOBAL_CONFIG), tx.object(CETUS_BM_INDEXER), tx.object(SUI_USDC_POOL), tx.object(bmId),
             suiCoin, usdcZero, deepZero,
-            tx.pure.u8(0), tx.pure.u8(0), priceU64, quantityMIST,
-            tx.pure.bool(false), tx.pure.bool(false), expireTime, tx.object.clock()
+            tx.pure.u8(0), tx.pure.u8(0), tx.pure.u64(priceU64), tx.pure.u64(quantityMIST),
+            tx.pure.bool(false), tx.pure.bool(false), tx.pure.u64(expireTime), tx.object.clock()
           ],
           typeArguments: [SUI_COIN, USDC_COIN]
         })
