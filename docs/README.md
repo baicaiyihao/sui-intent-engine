@@ -232,23 +232,60 @@ sui-intent-engine/
 
 ## 🚀 Quick Start
 
+The project has three independent layers. **The frontend works standalone** — clone and `npm run dev` shows the live landing page immediately. Backend services unlock AI + live market data.
+
+### Layer 1 — Frontend (always works)
 ```bash
-# Backend (intent server, port 8001)
-cd /Users/stom698/git/QuantDinger/sui-intent-engine
-python -m src.sui_intent_server
-
-# Quant / AI server (port 8000) — needed for AI signals + backtest
-python -m uvicorn server:app --host 0.0.0.0 --port 8000
-
-# Frontend (dev, port 3000)
-cd src/frontend
+git clone https://github.com/baicaiyihao/sui-intent-engine.git
+cd sui-intent-engine/src/frontend
 npm install
 npm run dev
+# → http://localhost:3000
 ```
 
-Open <http://localhost:3000>. Default language is **English**. Toggle `中 / EN` in the header.
+The landing page, Trading UI, K-line chart, and order book all load against **live Sui mainnet** public endpoints. No env, no API key, no backend needed to see the UI.
 
-**Test wallet**: Sui mainnet required. Connect via Sui Wallet / Suiet / Ethos. Trades hit the real SUI/USDC pool on DeepBook V3.
+### Layer 2 — Intent backend (port 8001, market data + intent parsing)
+```bash
+cd sui-intent-engine
+pip install -r requirements.txt
+cp src/.env.example src/.env       # then fill in LLM_API_KEY
+python -m src.sui_intent_server    # → http://localhost:8001
+```
+
+Brings live ticker + K-line cache + intent parser online. **Requires the sibling `quant_core` repo** (its `data_source` module is used for cache warming):
+```bash
+git clone https://github.com/baicaiyihao/quant_core.git ../quant_core
+export PYTHONPATH=$PWD/../quant_core:$PWD/src
+```
+
+### Layer 3 — Quant/AI backend (port 8000, AI chat + signals)
+```bash
+# Same env as Layer 2 + needs an LLM API key
+python -m uvicorn server:app --host 0.0.0.0 --port 8000
+```
+
+Needed for AI chat, signal generation, backtest. Uses `quant_core`'s LLM service.
+
+### Open <http://localhost:3000>
+
+Default language: **English**. Toggle `中 / EN` in the header.
+
+**Wallet**: Sui mainnet required. Connect via Sui Wallet / Suiet / Ethos. Trades hit the real SUI/USDC pool on DeepBook V3. **Every intent pays 0.005 SUI protocol fee** to `0x5e54f169...8ed91`.
+
+### What you can demo without any API key
+
+| Feature | Needs backend? | Needs LLM key? |
+|---|---|---|
+| Landing page + 4-step flow | ❌ | ❌ |
+| Live SUI/USDC chart (TradingPage) | ⚠️ shows "OFFLINE" without :8001 | ❌ |
+| Live order book (OrderBook) | ⚠️ shows "OFFLINE" without :8001 | ❌ |
+| Connect wallet (Sui mainnet) | ❌ | ❌ |
+| Place a DeepBook order | ❌ | ❌ |
+| AI chat / quick questions | ✅ | ✅ |
+| AI signal + backtest | ✅ | ✅ |
+
+The frontend and on-chain contract work **without any setup** — judges can verify the live mainnet state on SuiVision.
 
 ---
 

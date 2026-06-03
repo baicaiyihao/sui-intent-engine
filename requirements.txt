@@ -1,23 +1,31 @@
-# SuiIntent Guardian Requirements
+# SuiIntent Engine backend (sui_intent_server + quant AI)
+#
+# Install with:  pip install -r requirements.txt
+#
+# NOTE: The full quant_core module is required for /server (port 8000) —
+# it's a sibling project. Clone it next to this repo:
+#   git clone https://github.com/baicaiyihao/quant_core.git ../quant_core
+#   export PYTHONPATH=$PWD/../quant_core:$PWD/src
+#
+# Without quant_core, only sui_intent_server (port 8001) can run.
 
-# Core
+# Web framework
 fastapi>=0.100.0
 uvicorn>=0.23.0
 pydantic>=2.0.0
+python-dotenv>=1.0.0
 
-# SUI SDK
-sui-sdk>=0.1.0
-
-# AI / LLM
-minimax-api>=0.1.0
-
-# Data
+# Data + math
 pandas>=2.0.0
 numpy>=1.24.0
 requests>=2.31.0
+aiohttp>=3.9.0
 
-# Storage
-walrus-sdk>=0.1.0
+# Quant / exchange data (used by quant_core — installed here for convenience)
+ccxt>=4.0.0
 
-# Utils
-python-dotenv>=1.0.0
+# Optional: Gradio UI for some quant_core tools
+# gradio>=4.0.0
+
+# Optional: Sui SDK for on-chain reads
+# pysui>=0.50.0
