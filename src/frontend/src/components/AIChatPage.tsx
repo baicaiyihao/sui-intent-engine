@@ -13,6 +13,12 @@ const USDC_COIN = '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f
 const SUI_COIN = '0x2::sui::SUI'
 const DEEP_COIN = '0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP'
 
+// Protocol fee (sui_intent_fee::protocol_fee) — 0.005 SUI per intent
+// Package & Treasury published 2026-06-03 to Sui mainnet.
+const FEE_PKG = '0xad95919bbc8e08a36c28bf885fd7e8413296f63979d13b329d8713424157fd90'
+const FEE_TREASURY = '0x5e54f169aa2df2c3fe2a7624170d1c85feb7ebf9b54f57e51cb80fc84578ed91'
+const FEE_MIST = 5_000_000 // 0.005 SUI per intent (must match on-chain fee_per_intent)
+
 // Backend endpoints
 const QUANT_API = 'http://localhost:8000'
 const DEEPBOOK_API = 'http://localhost:8001'
@@ -473,9 +479,24 @@ function AIChatPage() {
     setExecuting(true)
 
     const tx = new Transaction()
-    tx.setGasBudget(50000000)
+    tx.setGasBudget(55000000) // 50M base + 5M for protocol fee
     tx.setSender(account.address)
 
+    // 1. Pay the protocol fee first (0.005 SUI per intent).
+    //    Split a fee coin from gas, then call pay_fee which puts the fee
+    //    in the shared ProtocolTreasury and returns any overpay to sender.
+    const [feeCoin] = tx.splitCoins(tx.gas, [BigInt(FEE_MIST)])
+    const intentTypeBytes = Array.from(new TextEncoder().encode('intent'))
+    tx.moveCall({
+      target: `${FEE_PKG}::protocol_fee::pay_fee`,
+      arguments: [
+        tx.object(FEE_TREASURY),
+        feeCoin,
+        tx.pure.vector('u8', intentTypeBytes),
+      ],
+    })
+
+    // 2. Then split the trade coin from the (now reduced) gas.
     const [suiCoin] = tx.splitCoins(tx.gas, [BigInt(Math.floor(proposal.quantity * 1e9))])
 
     const [usdcZero] = tx.moveCall({
@@ -562,7 +583,14 @@ function AIChatPage() {
                   }
                 }
               }
-              setTxResult(t('aiChat.orderOk', { digest: execResult.digest }))
+              // Look for the FeePaid event emitted by sui_intent_fee::protocol_fee
+              const feeEvent = (execResult.events || []).find(
+                (e: any) => typeof e?.type === 'string' && e.type.endsWith('::protocol_fee::FeePaid')
+              )
+              const feeNote = feeEvent
+                ? ` · fee 0.005 SUI (#${(feeEvent.parsedJson as any)?.intent_number ?? '?'})`
+                : ''
+              setTxResult(t('aiChat.orderOk', { digest: execResult.digest }) + feeNote)
               setProposal(null)
             } else {
               setTxResult(t('aiChat.orderFailed'))
@@ -821,6 +849,10 @@ function AIChatPage() {
                 <div className="info-row total">
                   <span>{proposal.action === 'buy' ? t('aiChat.proposal.estimate.buy') : t('aiChat.proposal.estimate.sell')}</span>
                   <span className="mono">{(proposal.price * proposal.quantity).toFixed(4)} {proposal.action === 'buy' ? 'USDC' : 'SUI'}</span>
+                </div>
+                <div className="info-row fee">
+                  <span>{t('aiChat.proposal.field.fee')}</span>
+                  <span className="mono">0.005 SUI</span>
                 </div>
                 {proposal.action === 'buy' && proposal.maxQuantity != null && proposal.price * proposal.quantity > (proposal.availableBalance || 0) * 0.98 && (
                   <div className="info-warn">{t('aiChat.proposal.warn')}</div>

@@ -530,6 +530,19 @@
   font-weight: 700;
 }
 
+.info-row.fee {
+  font-size: 0.74rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.info-row.fee .mono {
+  color: var(--accent-blue, #4a9eff);
+  font-weight: 600;
+  font-style: normal;
+  opacity: 0.85;
+}
+
 .info-warn {
   margin-top: 0.4rem;
   padding: 0.45rem 0.65rem;
