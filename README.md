@@ -116,7 +116,31 @@ The frontend's `proposal-actions` step refuses to enable the **Confirm** button 
 
 We plan to monetize in four layered ways. None require changing the core engine.
 
-### 1. Transaction Fee Rebate (核心收入)
+### 0. **On-Chain Protocol Fee** (新上线 · live on mainnet)
+
+Every user Intent pays **0.005 SUI** to an on-chain `ProtocolTreasury` shared object via the `sui_intent_fee::protocol_fee` Move module. The fee is charged as the first step of the intent PTB, before the DeepBook trade — same tx, atomic.
+
+- **Mainnet Package**: `0xad95919bbc8e08a36c28bf885fd7e8413296f63979d13b329d8713424157fd90`
+- **Mainnet Treasury** (shared): `0x5e54f169aa2df2c3fe2a7624170d1c85feb7ebf9b54f57e51cb80fc84578ed91`
+- **Testnet Package**: `0x9e7d5e8048f44773afede881ebb65422c01f686cfe2f141fb7bf9ef002859465`
+- **11/11 unit tests passing** · published 2026-06-03
+- **Verified on mainnet** — tx `4jGNB1W56Ehfy73nHEyfrK48XxQmWkzcDePVPxehvG1D`
+
+| Event | When | Use |
+|---|---|---|
+| `FeePaid { payer, amount, intent_type, intent_number }` | every intent | analytics / dashboards |
+| `FeeWithdrawn { admin, amount }` | admin sweep | treasury management |
+| `FeeUpdated { old_fee, new_fee }` | admin repricing | governance log |
+| `AdminTransferred { old_admin, new_admin }` | role change | role handoff |
+
+- **Default fee**: 5,000,000 MIST = 0.005 SUI / intent (admin can change via `set_fee`)
+- **Fee-per-intent economics**: 1,000 intents = 5 SUI; 10,000 intents = 50 SUI; 100,000 intents = 500 SUI
+- **At SUI = $3**: 100K intents = **~$1,500/month** pure protocol revenue
+- **Withdrawable**: admin can call `withdraw_all` at any time; treasury can also be repurposed for staking/DAO later
+
+Source: `move/sui_intent_fee/` · 220 lines Move + 240 lines tests.
+
+### 1. Transaction Fee Rebate (DeepBook 返佣)
 - DeepBook V3 charges 0.10% taker / 0.05% maker.
 - Aggregate daily volume through the intent engine → negotiate fee rebate with DeepBook/treasury.
 - **Projection**: $1M daily volume at 0.05% rebate = $500/day = **$180K/year** at scale.
@@ -156,6 +180,7 @@ We plan to monetize in four layered ways. None require changing the core engine.
 | AI | LLM (bilingual prompt dicts) + Guardian rule engine (6 risk checks) |
 | Quant | Pandas · NumPy · custom indicator library |
 | Chain | Sui SDK (`@mysten/sui`), SuiJsonRpcClient, TransactionBuilder |
+| On-chain | **Move 2024.beta** · `sui_intent_fee::protocol_fee` (published mainnet) |
 | CLOB | DeepBook V3 mainnet · Cetus utils for BM + deposit + place order |
 | Data | DeepBook V3 indexer (live) · CCXT (quant backtest only) |
 | i18n | Custom Context (zero deps, 27 landing keys + 300+ app keys) |
@@ -166,6 +191,10 @@ We plan to monetize in four layered ways. None require changing the core engine.
 
 ```
 sui-intent-engine/
+├── move/
+│   └── sui_intent_fee/          # ⛓️ Move 2024.beta — protocol fee contract
+│       ├── sources/protocol_fee.move   # ProtocolTreasury shared object + pay_fee
+│       └── tests/protocol_fee_tests.move  # 11/11 unit tests
 ├── docs/                        # Technical documentation
 │   ├── ARCHITECTURE.md
 │   ├── PRODUCT.md
