@@ -24,6 +24,11 @@ __pycache__/
 *.log
 npm-debug.log*
 
+# start.sh / stop.sh runtime artifacts
+.pids/
+logs/
+.venv/
+
 # OS files
 .DS_Store
 Thumbs.db

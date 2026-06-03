@@ -232,9 +232,35 @@ sui-intent-engine/
 
 ## 🚀 Quick Start
 
-The project has three independent layers. **The frontend works standalone** — clone and `npm run dev` shows the live landing page immediately. Backend services unlock AI + live market data.
+The fastest path — **one command** brings up the whole stack:
 
-### Layer 1 — Frontend (always works)
+```bash
+git clone https://github.com/baicaiyihao/sui-intent-engine.git
+cd sui-intent-engine
+./start.sh           # auto-installs deps, starts :3000 / :8000 / :8001
+# → http://localhost:3000
+```
+
+`./start.sh` auto-detects your Python env in this order:
+1. **`conda:crawl4ai`** if you have a conda env named `crawl4ai` (recommended — match the project)
+2. **`.venv`** at repo root if you have one
+3. **fresh `.venv`** auto-created with `python3 -m venv` if you have system Python 3
+
+It also runs `npm install` on first boot. PIDs land in `.pids/`, logs in `logs/`. Shut down with `./stop.sh`.
+
+### What gets started
+
+| Layer | URL | Tech | Auto-starts? |
+|---|---|---|---|
+| Frontend | http://localhost:3000 | Vite + React | ✅ via `./start.sh` |
+| Backend A (QuantCore AI) | http://localhost:8000 | FastAPI :8000, Swagger at `/docs` | ✅ via `./start.sh` |
+| Backend B (SuiIntent) | http://localhost:8001 | FastAPI :8001, Swagger at `/docs` | ✅ via `./start.sh` |
+
+### Manual start (per layer)
+
+If you prefer to start each layer by hand — useful for debugging — the project has three independent layers:
+
+#### Layer 1 — Frontend only (always works)
 ```bash
 git clone https://github.com/baicaiyihao/sui-intent-engine.git
 cd sui-intent-engine/src/frontend
@@ -245,27 +271,21 @@ npm run dev
 
 The landing page, Trading UI, K-line chart, and order book all load against **live Sui mainnet** public endpoints. No env, no API key, no backend needed to see the UI.
 
-### Layer 2 — Intent backend (port 8001, market data + intent parsing)
+#### Layer 2 — Intent backend (port 8001, market data + intent parsing)
 ```bash
 cd sui-intent-engine
 pip install -r requirements.txt
-cp src/.env.example src/.env       # then fill in LLM_API_KEY
-python -m src.sui_intent_server    # → http://localhost:8001
+cp src/.env.example src/.env       # then fill in LLM_API_KEY (optional for market data)
+python -m uvicorn src.sui_intent_server:app --host 0.0.0.0 --port 8001
 ```
 
-Brings live ticker + K-line cache + intent parser online. **Requires the sibling `quant_core` repo** (its `data_source` module is used for cache warming):
-```bash
-git clone https://github.com/baicaiyihao/quant_core.git ../quant_core
-export PYTHONPATH=$PWD/../quant_core:$PWD/src
-```
-
-### Layer 3 — Quant/AI backend (port 8000, AI chat + signals)
+#### Layer 3 — Quant/AI backend (port 8000, AI chat + signals)
 ```bash
 # Same env as Layer 2 + needs an LLM API key
-python -m uvicorn server:app --host 0.0.0.0 --port 8000
+python -m uvicorn src.server:app --host 0.0.0.0 --port 8000
 ```
 
-Needed for AI chat, signal generation, backtest. Uses `quant_core`'s LLM service.
+Needed for AI chat, signal generation, backtest.
 
 ### Open <http://localhost:3000>
 

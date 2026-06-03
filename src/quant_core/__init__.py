@@ -6,7 +6,14 @@ from .quant_engine import QuantEngine
 from .market_data import get_market_data_collector
 from .database import get_database
 from .strategy.indicators import calculate_indicator
-from .web import launch_ui
+
+# Gradio-based UI is optional — only import if gradio is installed
+try:
+    from .web import launch_ui
+    _HAS_UI = True
+except ImportError:
+    launch_ui = None
+    _HAS_UI = False
 
 __all__ = [
     "get_llm_service",
