@@ -1,0 +1,20 @@
+# SUI Intent Engine — Demo Video Narration
+# Each line is a section. Format: section_id|text
+# Target: ~3 min total (8 sections × ~20s + 3s lead-in + 7 × 3s gaps)
+# 00_intro   15s  hook
+# 10_problem 20s  pain points
+# 20_stack   20s  one-command start
+# 30_landing 20s  landing walkthrough
+# 40_ai      20s  AI chat demo
+# 50_protocol 20s fee + SuiVision
+# 60_roadmap 30s  future plans
+# 70_close   10s  CTA
+
+00_intro|Sui Intent Engine. Speak the trade. The chain obeys. A natural language trading desk for Sui mainnet. Built in ninety hours. Ready to ship.
+10_problem|Centralized exchanges hold your keys. Trading bots speak Python, not English. Liquidity is fragmented across dozens of DEXs. We fix this. Plain English in. Signed transaction block out. No custody. No code. No limits.
+20_stack|One command. Start dot sh auto-installs dependencies, detects your Python environment, and boots the full stack. Frontend on port three thousand. Quant core AI on port eight thousand. Sui intent on port eight thousand and one. Cold start in under ten seconds.
+30_landing|Open the landing page. Four step flow. Parse. Guard. Preview. Sign. The live ticker streams real SUI USDC prices from the DeepBook indexer on Sui mainnet. Click enter app to enter the trading floor.
+40_ai|Tap the AI chat tab. Type a plain English intent. For example, buy one SUI if RSI is below thirty. The engine parses it, runs the six dimension Guardian risk check, and shows you a human readable transaction block card with price, size, total cost, and expiry.
+50_protocol|Every intent pays a zero point zero zero five SUI protocol fee, enforced by our own Move contract deployed to Sui mainnet. See the transaction hash and treasury on Sui vision. We pay the gas, you keep the alpha.
+60_roadmap|What is next. Cross chain intents, bridge to Ethereum and Solana. Mobile SDK for one tap trading. A strategy marketplace where users share profitable prompts. On chain backtests verifiable by anyone. Multi LLM provider support so you bring your own key. We are open source and welcome contributors. Sui Intent Engine is the trading desk for the next billion on chain users.
+70_close|Sui Intent Engine. Speak the trade. Chain obeys. One command to start. Mainnet ready. Star us on GitHub. The link is in the description.

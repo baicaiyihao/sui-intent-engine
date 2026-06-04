@@ -29,6 +29,10 @@ npm-debug.log*
 logs/
 .venv/
 
+# Demo video pipeline — generated audio / video / caption PNGs
+# Regenerate via scripts/build_slideshow.sh (source PNGs are in scripts/demo_*.png, also gitignored)
+scripts/demo/out/
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -4,8 +4,20 @@
 > A Sui-native intent engine for the Agentic Web.
 
 [![Track](https://img.shields.io/badge/Sui%20Agentic%20Hackathon-Sub--track%2003%20%C2%B7%20Intent%20Engine-c8ff00?style=for-the-badge)](#why-this-sub-track)
-[![Live](https://img.shields.io/badge/SUI%20MAINNET-LIVE-00d4aa?style=for-the-badge)](#demo)
+[![Live](https://img.shields.io/badge/SUI%20MAINNET-LIVE-00d4aa?style=for-the-badge)](#-demo)
 [![Bilingual](https://img.shields.io/badge/i18n-EN%20%C2%B7%20ZH-4da2ff?style=for-the-badge)](#)
+
+---
+
+## 🎬 Demo
+
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=WVW8DdnqkXY">
+    <img src="https://img.youtube.com/vi/WVW8DdnqkXY/maxresdefault.jpg" alt="SUI Intent Engine — 2:35 demo" width="800" />
+  </a>
+  <br />
+  <sub>2:35 — problem · one-command start · landing · AI chat · on-chain SuiVision · roadmap</sub>
+</div>
 
 ---
 
