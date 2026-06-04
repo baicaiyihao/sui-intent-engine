@@ -103,7 +103,7 @@ Each check returns a `RiskCheck` with `status` (pass / warn / fail) and a human-
 - `risk_score`: weighted sum (-100 to +100)
 - `can_proceed`: `bool` — `false` for `high`/`critical` levels
 - `warnings`: list of plain-language risks
-- `recommendation`: "建议买入" / "建议暂缓" / etc.
+- `recommendation`: "Buy" / "Hold" / etc.
 
 The frontend's `proposal-actions` step refuses to enable the **Confirm** button if `can_proceed == false` and shows the warnings inline.
 
@@ -124,11 +124,11 @@ The frontend's `proposal-actions` step refuses to enable the **Confirm** button 
 
 ---
 
-## 💰 Business Model / Monetization (盈利方向)
+## 💰 Business Model / Monetization
 
 We plan to monetize in four layered ways. None require changing the core engine.
 
-### 0. **On-Chain Protocol Fee** (新上线 · live on mainnet)
+### 0. **On-Chain Protocol Fee** (live on mainnet)
 
 Every user Intent pays **0.005 SUI** to an on-chain `ProtocolTreasury` shared object via the `sui_intent_fee::protocol_fee` Move module. The fee is charged as the first step of the intent PTB, before the DeepBook trade — same tx, atomic.
 
@@ -152,25 +152,25 @@ Every user Intent pays **0.005 SUI** to an on-chain `ProtocolTreasury` shared ob
 
 Source: `move/sui_intent_fee/` · 220 lines Move + 240 lines tests.
 
-### 1. Transaction Fee Rebate (DeepBook 返佣)
+### 1. Transaction Fee Rebate (DeepBook)
 - DeepBook V3 charges 0.10% taker / 0.05% maker.
 - Aggregate daily volume through the intent engine → negotiate fee rebate with DeepBook/treasury.
 - **Projection**: $1M daily volume at 0.05% rebate = $500/day = **$180K/year** at scale.
 
-### 2. Premium AI Signals (订阅制)
+### 2. Premium AI Signals
 | Tier | Price | Features |
 |---|---|---|
 | Free | $0 | 5 quick questions/day, basic RSI/MACD readouts |
 | Pro | $29/mo | Unlimited deep analysis, multi-TF consensus, custom indicators |
 | Pro+ | $99/mo | Real-time alerts, auto-trade signals, priority LLM |
 
-### 3. Strategy Marketplace (策略市场)
+### 3. Strategy Marketplace
 - Users publish strategies as PTB templates (e.g. "RSI < 30, buy 100 USDC SUI, +5% TP, -3% SL")
 - Others subscribe → **70/30 revenue split** (creator / protocol)
 - On-chain track record (fills, PnL) builds creator reputation
 - Long-term play — requires scale, but high-margin
 
-### 4. B2B / API Access (白标)
+### 4. B2B / API Access
 - Sell the **intent parser** as a service to other DeFi frontends
 - A lending protocol wants "repay my loan" → use our parser
 - **Pricing**: $X/month base + $0.001 per parse
@@ -301,7 +301,7 @@ Needed for AI chat, signal generation, backtest.
 
 ### Open <http://localhost:3000>
 
-Default language: **English**. Toggle `中 / EN` in the header.
+Default language: **English**. Toggle language in the header (`EN` / `中文`).
 
 **Wallet**: Sui mainnet required. Connect via Sui Wallet / Suiet / Ethos. Trades hit the real SUI/USDC pool on DeepBook V3. **Every intent pays 0.005 SUI protocol fee** to `0x5e54f169...8ed91`.
 
@@ -337,7 +337,7 @@ The frontend and on-chain contract work **without any setup** — judges can ver
 
 ## 🌐 Other Languages
 
-- [中文版 (Simplified Chinese)](./README.zh-CN.md) — full Chinese translation
+- [Simplified Chinese (简体中文)](./README.zh-CN.md) — full Chinese translation
 
 ---
 
