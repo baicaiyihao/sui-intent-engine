@@ -5,7 +5,7 @@
 
 [![Track](https://img.shields.io/badge/Sui%20Agentic%20Hackathon-Sub--track%2003%20%C2%B7%20Intent%20Engine-c8ff00?style=for-the-badge)](#why-this-sub-track)
 [![Live](https://img.shields.io/badge/SUI%20MAINNET-LIVE-00d4aa?style=for-the-badge)](#-demo)
-[![Bilingual](https://img.shields.io/badge/i18n-EN%20%C2%B7%20ZH-4da2ff?style=for-the-badge)](#)
+[![Bilingual](https://img.shields.io/badge/i18n-EN%20%C2%B7%20ZH-4da2ff?style=for-the-badge)](README.zh-CN.md)
 
 ---
 
@@ -335,30 +335,9 @@ The frontend and on-chain contract work **without any setup** — judges can ver
 
 ---
 
-## 🇨🇳 中文版简介
+## 🌐 Other Languages
 
-**SUI Intent Engine** 是一款基于 Sui 原生 CLOB (DeepBook V3) 的 **意图引擎**，专为 [Sui Agentic Hackathon · 赛道三 · 意图引擎] 而构建。
-
-**核心循环（4 步）**：
-
-1. **解析 (PARSE)** — 你用自然语言描述交易意图。LLM 将其编译为结构化意图（动作 / 金额 / 价格 / 触发条件）。
-2. **守护 (GUARD)** — Guardian 跑 6 维风险检查：RSI · MACD · 布林带 · KDJ · 成交量 · ADX。用大白话告诉你哪里有风险：滑点、弱趋势、低流动性、趋势反转。
-3. **预览 (PREVIEW)** — 人类可读的 PTB 卡片：价格、数量、总成本、过期时间、余额校验。无黑盒。
-4. **签名 (SIGN)** — 你显式确认。钱包签名。DeepBook V3 在 Sui 主网执行 PTB。
-
-**为什么是 Sub-track 3**：
-- ✅ 自然语言 → PTB → 执行
-- ✅ 人类可读的 PTB 预览
-- ✅ Guardian 覆盖 **6 维风险**（远超 2 维要求）
-- ✅ 用户显式确认，钱包签名
-
-**商业化**（4 层）：
-1. 交易手续费返佣 — DeepBook V3 收取 0.05–0.10% 手续费，聚合流量可谈返佣
-2. 订阅制 AI 信号 — Free / Pro $29 / Pro+ $99
-3. 策略市场 — 用户发布 PTB 模板，订阅分成 70/30
-4. B2B / API 接入 — 卖给其他 DeFi 前端
-
-详见上方英文版各章节。
+- [中文版 (Simplified Chinese)](./README.zh-CN.md) — full Chinese translation
 
 ---
 
