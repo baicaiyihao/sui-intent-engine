@@ -61,16 +61,10 @@ else
   cd "$APP_DIR"
 fi
 
-# ---------- 3. quant_core sibling ----------
-QUANT_CORE_DIR="$(dirname "$APP_DIR")/quant_core"
-if [ ! -d "$QUANT_CORE_DIR/.git" ]; then
-  say "3. Cloning quant_core sibling..."
-  git clone https://github.com/baicaiyihao/quant_core.git "$QUANT_CORE_DIR" || \
-    warn "quant_core clone failed — backend-A may not work. See requirements.txt header."
-else
-  say "3. quant_core sibling already at $QUANT_CORE_DIR"
-fi
-export PYTHONPATH="$QUANT_CORE_DIR:$APP_DIR/src"
+# ---------- 3. quant_core vendored inside repo ----------
+# quant_core lives at $APP_DIR/src/quant_core and is tracked by git,
+# so no separate clone is needed. The src/ dir is already on PYTHONPATH.
+say "3. quant_core is vendored at $APP_DIR/src/quant_core — using local copy."
 
 # ---------- 4. python env ----------
 if [ "$USE_VENV" = "1" ]; then
@@ -112,7 +106,7 @@ After=network.target
 Type=simple
 WorkingDirectory=$APP_DIR
 Environment="PATH=$APP_DIR/.venv/bin:/usr/local/bin:/usr/bin:/bin"
-Environment="PYTHONPATH=$QUANT_CORE_DIR:$APP_DIR/src"
+Environment="PYTHONPATH=$APP_DIR/src"
 ExecStart=$exec_cmd
 Restart=always
 RestartSec=3
