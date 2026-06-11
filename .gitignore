@@ -7,6 +7,11 @@
 *.webp
 *.svg
 
+# Exception: project logo assets (under assets/) should be tracked
+!assets/**/*.svg
+!assets/**/*.png
+!assets/**/*.jpg
+
 # Sensitive files
 *.key
 *.pem

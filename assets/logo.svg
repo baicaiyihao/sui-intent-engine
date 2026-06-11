@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="dropGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4DA2FF"/>
+      <stop offset="100%" stop-color="#6FB8FF"/>
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0B0E1A"/>
+      <stop offset="100%" stop-color="#1A1F35"/>
+    </linearGradient>
+    <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C8FF00"/>
+      <stop offset="100%" stop-color="#9DD400"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background hex (6-dim guardian) -->
+  <polygon points="256,40 432,140 432,340 256,440 80,340 80,140"
+           fill="url(#shieldGrad)" stroke="url(#hexGrad)" stroke-width="6"
+           stroke-linejoin="round"/>
+
+  <!-- Sui water-drop silhouette (top) -->
+  <path d="M256 110
+           C 256 110, 200 165, 200 200
+           C 200 230, 225 255, 256 255
+           C 287 255, 312 230, 312 200
+           C 312 165, 256 110, 256 110 Z"
+        fill="url(#dropGrad)" opacity="0.95"/>
+
+  <!-- Inner hex highlight on drop -->
+  <polygon points="256,160 286,178 286,212 256,230 226,212 226,178"
+           fill="#0B0E1A" opacity="0.18"/>
+
+  <!-- "SIE" wordmark below -->
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
+     font-weight="700" fill="#FFFFFF" text-anchor="middle">
+    <text x="256" y="335" font-size="68" letter-spacing="6">SIE</text>
+    <text x="256" y="380" font-size="22" letter-spacing="3" font-weight="500" fill="#C8FF00">SUI INTENT ENGINE</text>
+  </g>
+</svg>

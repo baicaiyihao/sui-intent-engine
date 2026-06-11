@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B0E1A"/>
+      <stop offset="100%" stop-color="#1A1F35"/>
+    </linearGradient>
+    <linearGradient id="drop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4DA2FF"/>
+      <stop offset="100%" stop-color="#6FB8FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Big hex shield -->
+  <polygon points="200,100 380,200 380,400 200,500 20,400 20,200"
+           fill="#0B0E1A" stroke="#C8FF00" stroke-width="4"/>
+
+  <!-- Sui drop -->
+  <path d="M200 175 C 200 175, 140 235, 140 275 C 140 308, 167 335, 200 335 C 233 335, 260 308, 260 275 C 260 235, 200 175, 200 175 Z"
+        fill="url(#drop)"/>
+
+  <!-- Text block on the right -->
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" fill="#FFFFFF">
+    <text x="460" y="240" font-size="42" font-weight="600" fill="#C8FF00">SUI INTENT ENGINE</text>
+    <text x="460" y="320" font-size="76" font-weight="800" letter-spacing="-2">Say your trade.</text>
+    <text x="460" y="400" font-size="76" font-weight="800" letter-spacing="-2">Read the risks.</text>
+    <text x="460" y="480" font-size="76" font-weight="800" letter-spacing="-2">Sign the PTB.</text>
+    <text x="460" y="555" font-size="24" font-weight="500" fill="#A0A8C0">Natural language → 6-dim Guardian → DeepBook V3 mainnet</text>
+  </g>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="dropGradL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1976D2"/>
+      <stop offset="100%" stop-color="#2196F3"/>
+    </linearGradient>
+  </defs>
+  <polygon points="256,40 432,140 432,340 256,440 80,340 80,140"
+           fill="#FFFFFF" stroke="#1976D2" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M256 110 C 256 110, 200 165, 200 200 C 200 230, 225 255, 256 255 C 287 255, 312 230, 312 200 C 312 165, 256 110, 256 110 Z"
+        fill="url(#dropGradL)"/>
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
+     font-weight="700" fill="#0B0E1A" text-anchor="middle">
+    <text x="256" y="335" font-size="68" letter-spacing="6">SIE</text>
+    <text x="256" y="380" font-size="22" letter-spacing="3" font-weight="500" fill="#1976D2">SUI INTENT ENGINE</text>
+  </g>
+</svg>
