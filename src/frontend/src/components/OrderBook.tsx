@@ -13,9 +13,8 @@ interface OrderBookProps {
   onPriceClick?: (price: number) => void
 }
 
-// Backend API for cached DeepBook data
-// Empty string → relative URL, routed by Vite proxy (dev) or Vercel rewrites (prod)
-const API_BASE = ''
+// Backend API base — direct to production duckdns
+const API_BASE = 'https://sui-intent.duckdns.org'
 
 function OrderBook({ onPriceClick }: OrderBookProps) {
   const [asks, setAsks] = useState<OrderBookEntry[]>([])

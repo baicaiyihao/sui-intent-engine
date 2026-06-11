@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n/I18nProvider'
 import './LandingPage.css'
 
-const DEEPBOOK_API = ''  // relative — Vite proxy / Vercel rewrites route this
+const DEEPBOOK_API = 'https://sui-intent.duckdns.org'
 
 interface TickerData {
   last_price: number

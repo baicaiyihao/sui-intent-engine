@@ -4,10 +4,9 @@ import { Transaction } from '@mysten/sui/transactions'
 import { useI18n, TranslationKey } from '../i18n/I18nProvider'
 import './AIStrategyPage.css'
 
-// Backend APIs — empty string = relative URL
-// Routed by Vite proxy (dev) or Vercel rewrites (prod) to the right backend.
-const QUANT_API = ''      // quant_core: AI signals, performance, indicators
-const DEEPBOOK_API = ''   // DeepBook: live ticker cache
+// Backend APIs — direct to production duckdns
+const QUANT_API = 'https://sui-intent.duckdns.org'       // quant_core: AI signals, performance, indicators
+const DEEPBOOK_API = 'https://sui-intent.duckdns.org'   // DeepBook: live ticker cache
 
 // DeepBook V3 contract addresses
 const UTILS_PKG = '0x600138d3179e2fc746f6774f360a6e1fa68e90d66d082af66399adabe46f22a4'
