@@ -19,9 +19,10 @@ const FEE_PKG = '0xad95919bbc8e08a36c28bf885fd7e8413296f63979d13b329d8713424157f
 const FEE_TREASURY = '0x5e54f169aa2df2c3fe2a7624170d1c85feb7ebf9b54f57e51cb80fc84578ed91'
 const FEE_MIST = 5_000_000 // 0.005 SUI per intent (must match on-chain fee_per_intent)
 
-// Backend endpoints
-const QUANT_API = 'http://localhost:8000'
-const DEEPBOOK_API = 'http://localhost:8001'
+// Backend endpoints — empty string means relative URL
+// (Vite proxy in dev, Vercel rewrites in prod) will route them to the right backend.
+const QUANT_API = ''
+const DEEPBOOK_API = ''
 
 interface Message {
   id?: string

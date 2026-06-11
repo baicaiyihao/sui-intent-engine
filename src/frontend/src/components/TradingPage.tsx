@@ -11,7 +11,7 @@ import './TradingPage.css'
 
 type BottomTab = 'open' | 'history' | 'trades'
 
-const API_BASE = 'http://localhost:8001'
+const API_BASE = ''  // relative — Vite proxy (dev) or Vercel rewrites (prod) handle it
 const V1_PKG = '0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809'
 const SUI_COIN = '0x2::sui::SUI'
 const USDC_COIN = '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC'

@@ -23,7 +23,8 @@ interface TickerData {
 }
 
 // Backend API for cached DeepBook data
-const API_BASE = 'http://localhost:8001'
+// Empty string → use relative URL, so Vite dev proxy (dev) or Vercel rewrites (prod) handle routing
+const API_BASE = ''
 
 const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'] as const
 type Timeframe = typeof TIMEFRAMES[number]

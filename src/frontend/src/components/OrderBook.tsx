@@ -14,7 +14,8 @@ interface OrderBookProps {
 }
 
 // Backend API for cached DeepBook data
-const API_BASE = 'http://localhost:8001'
+// Empty string → relative URL, routed by Vite proxy (dev) or Vercel rewrites (prod)
+const API_BASE = ''
 
 function OrderBook({ onPriceClick }: OrderBookProps) {
   const [asks, setAsks] = useState<OrderBookEntry[]>([])
